@@ -240,65 +240,156 @@ function App() {
     }
   };
 
-  const getRankingsByLine = (nickname, field, line) => {
-    if (!allStats.length) return null;
-    const lineStats = line === 'ALL' ? allStats : allStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
-    const nicknames = [...new Set(lineStats.map(s => s.nickname))];
-    const rankingData = nicknames.map(name => {
+  const getRankingsByLine = (nickname, field, line, currentData) => {
+  if (!allStats.length || !currentData) return null;
+
+  // 1. 해당 라인 데이터 필터링
+  const lineStats = line === 'ALL' ? allStats : allStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
+  const nicknames = [...new Set(lineStats.map(s => s.nickname))];
+
+  // 2. "나"를 제외한 타인들의 평균 데이터 산출
+  const otherAverages = nicknames
+    .filter(name => name !== nickname)
+    .map(name => {
       const pHistory = lineStats.filter(s => s.nickname === name);
       let tMin = 0, tDmg = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0;
       let tDtpm = 0, tDmgShare = 0, tFB = 0, tCW = 0, tKpSum = 0;
-      pHistory.forEach(s => { 
-        const [min, sec] = (s.matches?.duration || "20:00").split(':').map(Number); 
-        const m = min + (sec / 60) || 20; tMin += m; 
-        tDmg += Number(s.damage || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0); 
-        tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0);
-        tDtpm += Number(s.damage_taken || 0); tCW += Number(s.control_wards || 0);
+
+      pHistory.forEach(s => {
+        const [min, sec] = (s.matches?.duration || "20:00").split(':').map(Number);
+        const m = min + (sec / 60) || 20; 
+        tMin += m;
+        tDmg += Number(s.damage || 0); 
+        tGold += Number(s.gold || 0); 
+        tCs += Number(s.cs || 0);
+        tVis += Number(s.vision_score || 0); 
+        tK += Number(s.kills || 0); 
+        tA += Number(s.assists || 0); 
+        tD += Number(s.deaths || 0);
+        tDtpm += Number(s.damage_taken || 0); 
+        tCW += Number(s.control_wards || 0);
+
         if (s.first_blood === true || s.first_blood === 'true' || s.first_blood === 1) tFB += 1;
+
         const teamStats = allStats.filter(st => st.match_id === s.match_id && st.side === s.side);
         const teamDmg = teamStats.reduce((sum, p) => sum + Number(p.damage || 0), 0);
         const teamKills = teamStats.reduce((sum, p) => sum + Number(p.kills || 0), 0);
+        
         tDmgShare += teamDmg > 0 ? (Number(s.damage || 0) / teamDmg) : 0;
         tKpSum += teamKills > 0 ? ((Number(s.kills || 0) + Number(s.assists || 0)) / teamKills) : 0;
       });
-      return { 
-        nickname: name, avgDpm: tDmg / (tMin || 1), avgGpm: tGold / (tMin || 1), avgCspm: tCs / (tMin || 1), 
-        avgVs: tVis / (pHistory.length || 1), avgDpg: tGold > 0 ? tDmg / tGold : 0, 
-        avgKda: tD === 0 ? (tK + tA) : (tK + tA) / tD,
-        avgDtpm: tDtpm / (tMin || 1), avgDmgShare: (tDmgShare / (pHistory.length || 1)) * 100,
-        fbRate: (tFB / (pHistory.length || 1)) * 100, avgControlWards: tCW / (pHistory.length || 1),
+
+      // 각 필드별 평균값 계산
+      const stats = {
+        avgDpm: tDmg / (tMin || 1), 
+        avgGpm: tGold / (tMin || 1), 
+        avgCspm: tCs / (tMin || 1),
+        avgVs: tVis / (pHistory.length || 1), 
+        avgDpg: tGold > 0 ? tDmg / tGold : 0,
+        // ⭐ 타인의 KDA가 Perfect(데스 0)인 경우 99999점 부여
+        avgKda: tD === 0 ? 99999 : (tK + tA) / tD,
+        avgDtpm: tDtpm / (tMin || 1), 
+        avgDmgShare: (tDmgShare / (pHistory.length || 1)) * 100,
+        fbRate: (tFB / (pHistory.length || 1)) * 100, 
+        avgControlWards: tCW / (pHistory.length || 1),
         avgKp: (tKpSum / (pHistory.length || 1)) * 100
       };
+
+      return stats[field];
     });
-    const sorted = [...rankingData].sort((a, b) => b[field] - a[field]);
-    const rankIndex = sorted.findIndex(p => p.nickname === nickname);
-    return rankIndex >= 0 && rankIndex < 3 ? { line: line === 'ALL' ? 'ALL' : line, rank: rankIndex + 1 } : null;
+
+  // 3. 나의 현재 점수 가져오기 (Perfect/문자열 방어 로직)
+  let myVal = currentData[field];
+  
+  // 필드명이 다를 경우를 위한 폴백
+  if (myVal === undefined) {
+    const shortKey = field.replace('avg', '').toLowerCase();
+    myVal = currentData[shortKey] || currentData[field.replace('avg', 'avg_')] || 0;
+  }
+
+  let myCurrentScore;
+  // ⭐ KDA 필드일 때 "Perfect" 혹은 데스가 0인 경우(Infinity) 처리
+  if (field === 'avgKda' || field === 'kda') {
+    const isPerfect = (myVal === "Perfect" || String(myVal).includes("Perfect") || (!isFinite(parseFloat(myVal)) && parseFloat(myVal) > 0));
+    myCurrentScore = isPerfect ? 99999 : (parseFloat(String(myVal).replace(/[^0-9.]/g, '')) || 0);
+  } else {
+    myCurrentScore = parseFloat(String(myVal).replace(/[^0-9.]/g, '')) || 0;
+  }
+
+  // 4. [타인들의 평균들 + 나의 현재 점수] 통합 리스트 생성 및 정렬
+  // 내림차순 정렬 (큰 값이 1등)
+  const combined = [...otherAverages, myCurrentScore].sort((a, b) => b - a);
+
+  // 5. 정렬된 리스트에서 내 점수의 첫 번째 인덱스를 찾아 순위 산출
+  const rank = combined.indexOf(myCurrentScore) + 1;
+
+  // 6. 결과 반환 (1등~3등 이내일 때만 뱃지 표시용 객체 반환)
+  return rank >= 1 && rank <= 3 
+    ? { line: line === 'ALL' ? 'ALL' : line, rank } 
+    : null;
+};
+
+  const getRadarData = (currentData, line) => {
+  if (!currentData || !allStats.length || line === 'ALL') return [];
+
+  const lineStats = allStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
+  
+  const calculateLineAvg = (stats) => {
+    let tMin = 0, tDmg = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0;
+    stats.forEach(s => {
+      const [min, sec] = (s.matches?.duration || "20:00").split(':').map(Number);
+      const m = min + (sec / 60) || 20; tMin += m;
+      tDmg += Number(s.damage || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0);
+      tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0);
+    });
+    const safeM = tMin > 0 ? tMin : 1;
+    const count = stats.length > 0 ? stats.length : 1;
+    
+    return {
+      avgDpm: tDmg / safeM, avgGpm: tGold / safeM, avgVs: tVis / count, avgCspm: tCs / safeM,
+      // 라인 평균 KDA 계산 시 데스가 0이면 10점으로 가정하여 NaN 방지
+      kda: tD === 0 ? Math.max(10, tK + tA) : (tK + tA) / tD,
+      avgDpg: tGold > 0 ? tDmg / tGold : 0
+    };
   };
 
-  const getRadarData = (nickname, line) => {
-    if (!allStats.length || line === 'ALL') return [];
-    let lineStats = allStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
-    let playerStatsInLine = lineStats.filter(s => s.nickname === nickname);
-    if (dataScope === 'RECENT') playerStatsInLine = playerStatsInLine.slice(0, 10);
-    const calculateAvgs = (stats) => {
-      let tMin = 0, tDmg = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0;
-      stats.forEach(s => { 
-        const [min, sec] = (s.matches?.duration || "20:00").split(':').map(Number); 
-        const m = min + (sec / 60) || 20; tMin += m; tDmg += Number(s.damage || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0); 
-        tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0); 
-      });
-      const safeM = tMin > 0 ? tMin : 1; const count = stats.length > 0 ? stats.length : 1;
-      return { DPM: tDmg / safeM, GPM: tGold / safeM, CSPM: tCs / safeM, VS: tVis / count, KDA: tD === 0 ? (tK + tA) : (tK + tA) / tD, DPG: tGold > 0 ? tDmg / tGold : 0 };
+  const lineActual = calculateLineAvg(lineStats);
+
+  const keys = [
+    { key: 'avgDpm', label: '전투' }, { key: 'avgGpm', label: '성장' }, 
+    { key: 'avgVs', label: '시야' }, { key: 'avgCspm', label: '파밍' }, 
+    { key: 'kda', label: '생존' }, { key: 'avgDpg', label: '효율' }
+  ];
+
+  return keys.map(k => {
+    const lAvg = lineActual[k.key] || 1;
+    let pVal = currentData[k.key];
+    let isPerfect = false;
+
+    // ⭐ KDA/생존 지표 NaN 방어 로직
+    if (k.key === 'kda') {
+      // "Perfect" 문자열이거나, Infinity(무한대)인 경우 체크
+      if (pVal === "Perfect" || String(pVal).includes("Perfect") || !isFinite(parseFloat(pVal))) {
+        isPerfect = true;
+      }
+    }
+
+    // 실제 숫자값 추출
+    const pAvg = isPerfect ? lAvg * 2 : (parseFloat(String(pVal).replace(/[^0-9.]/g, '')) || 0);
+    
+    // 그래프 포인트 계산 (퍼펙트면 100점, 아니면 평균 대비 계산)
+    const playerPoint = isPerfect ? 100 : Math.min(100, (pAvg / lAvg) * 50);
+
+    return {
+      subject: k.label,
+      player: playerPoint, // 주황색 영역 (NaN 방지됨)
+      average: 50,         // 회색 영역 (기준점)
+      // 툴팁에 표시될 실제 값 처리
+      actualPlayer: isPerfect ? "Perfect" : pAvg.toFixed(k.key === 'avgCspm' || k.key === 'avgDpg' ? 2 : 1),
+      actualAvg: lAvg.toFixed(k.key === 'avgCspm' || k.key === 'avgDpg' ? 2 : 1)
     };
-    const lineActual = calculateAvgs(lineStats);
-    const playerActual = calculateAvgs(playerStatsInLine);
-    const keys = [{ key: 'DPM', label: '전투' }, { key: 'GPM', label: '성장' }, { key: 'VS', label: '시야' }, { key: 'CSPM', label: '파밍' }, { key: 'KDA', label: '생존' }, { key: 'DPG', label: '효율' }];
-    return keys.map(k => {
-      const lAvg = lineActual[k.key] || 1; const pAvg = playerActual[k.key] || 0;
-      const playerPoint = Math.min(100, (pAvg / lAvg) * 50); 
-      return { subject: k.label, player: playerPoint, average: 50, actualPlayer: pAvg.toFixed(k.key === 'CSPM' || k.key === 'DPG' ? 2 : 1), actualAvg: lAvg.toFixed(k.key === 'CSPM' || k.key === 'DPG' ? 2 : 1) };
-    });
-  };
+  });
+};
 
   const getFilteredData = () => {
     if (!selectedPlayer) return null;
@@ -329,8 +420,13 @@ function App() {
     };
   };
 
-  const currentData = getFilteredData();
-  const radarData = selectedPlayer ? getRadarData(selectedPlayer.nickname, selectedLine) : [];
+  // 1. 현재 화면에 보여줄 필터링된 통계(라인/챔피언/최근10경기가 모두 반영됨)를 가져옵니다.
+const currentData = getFilteredData();
+
+// 2. 그 데이터를 getRadarData에 그대로 전달합니다.
+const radarData = (selectedPlayer && currentData) 
+  ? getRadarData(currentData, selectedLine) 
+  : [];
   const searchResults = [...new Set(allStats.map(s => s.nickname))]
     .filter(name => name.toLowerCase().includes(searchTerm.toLowerCase()))
     .map(name => {
@@ -585,21 +681,54 @@ function App() {
   })}
 </div>
 
-    {/* 1. 통계 아이템 그리드 */}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '25px' }}>
-      <StatItem label="승률" value={`${currentData.winRate}%`} color="#3b82f6" />
-      <StatItem label="KDA" value={currentData.kda} color="#10b981" rank={getRankingsByLine(selectedPlayer.nickname, 'avgKda', selectedLine)} />
-      <StatItem label="킬 관여율(KP)" value={`${currentData.avgKp}%`} color="#f472b6" rank={getRankingsByLine(selectedPlayer.nickname, 'avgKp', selectedLine)} />
-      <StatItem label="데미지 비중" value={`${currentData.avgDmgShare}%`} color="#e97171" rank={getRankingsByLine(selectedPlayer.nickname, 'avgDmgShare', selectedLine)} />
-      <StatItem label="퍼블율" value={`${currentData.fbRate}%`} color="#fbbf24" rank={getRankingsByLine(selectedPlayer.nickname, 'fbRate', selectedLine)} />
-      <StatItem label="분당 딜량" value={currentData.avgDpm} color="#8b5cf6" rank={getRankingsByLine(selectedPlayer.nickname, 'avgDpm', selectedLine)} />
-      <StatItem label="분당 받은 딜량" value={currentData.avgDtpm} color="#10b981" rank={getRankingsByLine(selectedPlayer.nickname, 'avgDtpm', selectedLine)} />
-      <StatItem label="분당 골드" value={currentData.avgGpm} color="#fbbf24" rank={getRankingsByLine(selectedPlayer.nickname, 'avgGpm', selectedLine)} />
-      <StatItem label="골드당 데미지" value={currentData.avgDpg} color="#ec4899" rank={getRankingsByLine(selectedPlayer.nickname, 'avgDpg', selectedLine)} />
-      <StatItem label="분당 CS" value={currentData.avgCspm} color="#10b981" rank={getRankingsByLine(selectedPlayer.nickname, 'avgCspm', selectedLine)} />
-      <StatItem label="시야 점수" value={currentData.avgVs} color="#60a5fa" rank={getRankingsByLine(selectedPlayer.nickname, 'avgVs', selectedLine)} />
-      <StatItem label="제어 와드" value={`${currentData.avgControlWards}개`} color="#60a5fa" rank={getRankingsByLine(selectedPlayer.nickname, 'avgControlWards', selectedLine)} />
-    </div>
+  <StatItem label="승률" value={`${currentData.winRate}%`} color="#3b82f6" />
+  
+  <StatItem 
+    label="KDA" value={currentData.kda} color="#10b981" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgKda', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="킬 관여율(KP)" value={`${currentData.avgKp}%`} color="#f472b6" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgKp', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="데미지 비중" value={`${currentData.avgDmgShare}%`} color="#e97171" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgDmgShare', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="퍼블율" value={`${currentData.fbRate}%`} color="#fbbf24" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'fbRate', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="분당 딜량" value={currentData.avgDpm} color="#8b5cf6" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgDpm', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="분당 받은 딜량" value={currentData.avgDtpm} color="#10b981" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgDtpm', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="분당 골드" value={currentData.avgGpm} color="#fbbf24" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgGpm', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="골드당 데미지" value={currentData.avgDpg} color="#ec4899" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgDpg', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="분당 CS" value={currentData.avgCspm} color="#10b981" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgCspm', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="시야 점수" value={currentData.avgVs} color="#60a5fa" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgVs', selectedLine, currentData)} 
+  />
+  <StatItem 
+    label="제어 와드" value={`${currentData.avgControlWards}개`} color="#60a5fa" 
+    rank={getRankingsByLine(selectedPlayer.nickname, 'avgControlWards', selectedLine, currentData)} 
+  />
+</div>
 
     {/* ⭐ 2. 모스트 픽 & 밴 섹션 (이 부분을 정확히 확인하세요) */}
 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
@@ -658,35 +787,43 @@ function App() {
       </div>
 
       {/* MOST BANNED 집계 */}
-      <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
-        <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px' }}>🚫 MOST BANNED </h3>
-        <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-          {(() => {
-            const banCounts = {};
-            const matchesArr = (typeof matches !== 'undefined') ? matches : [];
-            const history = selectedPlayer?.fullHistory || [];
+<div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
+  <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px' }}>🚫 MOST BANNED </h3>
+  <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+    {(() => {
+      const banCounts = {};
+      const matchesArr = (typeof matches !== 'undefined') ? matches : [];
 
-            history.forEach(h => {
-  const mId = h.match_id || h.matchId || h.id;
-  const match = matchesArr.find(m => String(m.id) === String(mId));
-  
-  if (match) {
-    // 플레이어의 현재 판 진영 확인
-    const myCurrentSide = h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue');
-    // 상대방 진영의 밴 목록만 가져오기
-    const opponentBans = myCurrentSide === 'Blue' ? (match.red_bans || []) : (match.blue_bans || []);
+      // 🚨 [여기를 수정!] 
+      // 기존: const history = selectedPlayer?.fullHistory || [];
+      // 수정 후: 
+      const history = (currentData?.history && currentData.history.length > 0) 
+        ? currentData.history 
+        : (selectedPlayer?.fullHistory || []);
 
-    opponentBans.forEach(b => {
-      if (!b.target || !b.champ) return;
-      const bTarget = String(b.target).toUpperCase().trim();
-      const pLane = String(h.lane || "").toUpperCase().trim();
-      
-      if (bTarget === pLane) {
-        banCounts[b.champ] = (banCounts[b.champ] || 0) + 1;
-      }
-    });
-  }
-});
+      history.forEach(h => {
+        const mId = h.match_id || h.matchId || h.id;
+        const match = matchesArr.find(m => String(m.id) === String(mId));
+        
+        if (match) {
+          // 플레이어의 현재 판 진영 확인 (h.side가 있으면 최우선 사용)
+          const myCurrentSide = (h.side || (h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue'))).toLowerCase();
+          
+          // 상대방 진영의 밴 목록 (내가 블루면 레드 밴을 확인)
+          const opponentBans = myCurrentSide.includes('blue') ? (match.red_bans || []) : (match.blue_bans || []);
+
+          opponentBans.forEach(b => {
+            if (!b.target || !b.champ) return;
+            const bTarget = String(b.target).toUpperCase().trim();
+            const pLane = String(h.lane || "").toUpperCase().trim();
+            
+            // 내 라인과 밴 타겟이 일치할 때만 카운트 (저격 밴)
+            if (bTarget === pLane) {
+              banCounts[b.champ] = (banCounts[b.champ] || 0) + 1;
+            }
+          });
+        }
+      });
 
             const sortedBans = Object.entries(banCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
