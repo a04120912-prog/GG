@@ -865,6 +865,189 @@ function HeadToHead({ allStats, matches, onNavigateToPlayer }) {
   );
 }
 /* =====================================================
+   리더보드 탭
+   ===================================================== */
+function Leaderboard({ allStats, matches }) {
+  const [selectedLane, setSelectedLane] = useState('TOP');
+  const [selectedMetric, setSelectedMetric] = useState('dpm');
+
+  const lanes = ['TOP', 'JNG', 'MID', 'ADC', 'SUP'];
+  const metrics = [
+    { id: 'dpm',     label: 'DPM',     color: '#fca5a5', desc: '분당 딜량' },
+    { id: 'dtpm',    label: 'DTPM',    color: '#34d399', desc: '분당 받은 딜량' },
+    { id: 'kda',     label: 'KDA',     color: '#10b981'},
+    { id: 'winRate', label: '승률',    color: '#60a5fa'},
+    { id: 'gpm',     label: 'GPM',     color: '#fbbf24', desc: '분당 골드' },
+    { id: 'cspm',    label: 'CSPM',    color: '#a78bfa', desc: '분당 CS' },
+    { id: 'avgVs',   label: '시야',    color: '#38bdf8', desc: '평균 시야 점수' },
+    { id: 'kp',      label: 'KP%',     color: '#f472b6', desc: '킬 관여율' },
+    { id: 'dpg',     label: '딜/골드', color: '#ec4899', desc: '골드당 데미지' },
+  ];
+
+  const normalizeLane = (raw) => {
+    const u = String(raw || '').toUpperCase().trim();
+    const map = { 'JUNGLE': 'JNG', 'BOT': 'ADC', 'SUPPORT': 'SUP' };
+    return map[u] || u;
+  };
+
+  const rankings = (() => {
+    const nicknames = [...new Set(allStats.map(s => s.nickname))];
+    return nicknames.map(nickname => {
+      const laneStats = allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname);
+      if (laneStats.length === 0) return null;
+
+      let tMin = 0, tDmg = 0, tDmgTaken = 0, tGold = 0, tCs = 0, tVis = 0;
+      let tK = 0, tA = 0, tD = 0, tWins = 0, tKpSum = 0;
+      const count = laneStats.length;
+
+      laneStats.forEach(s => {
+        const [min, sec] = (s.matches?.duration || '20:00').split(':').map(Number);
+        const m = (min || 20) + (sec / 60 || 0);
+        tMin += m;
+        tDmg += Number(s.damage || 0);
+        tDmgTaken += Number(s.damage_taken || 0);
+        tGold += Number(s.gold || 0);
+        tCs += Number(s.cs || 0);
+        tVis += Number(s.vision_score || 0);
+        tK += Number(s.kills || 0);
+        tA += Number(s.assists || 0);
+        tD += Number(s.deaths || 0);
+        const mySide = String(s.side || '').trim().toLowerCase();
+        const winSide = String(s.matches?.win_team || '').trim().toLowerCase();
+        if (mySide && winSide && mySide === winSide) tWins++;
+        const teamStats = allStats.filter(st => st.match_id === s.match_id && st.side === s.side);
+        const teamKills = teamStats.reduce((sum, p) => sum + Number(p.kills || 0), 0);
+        tKpSum += teamKills > 0 ? ((Number(s.kills || 0) + Number(s.assists || 0)) / teamKills) : 0;
+      });
+
+      const safeM = tMin || 1;
+      const kdaNum = tD === 0 ? 9999 : (tK + tA) / tD;
+      const mostChamp = (() => {
+        const map = {};
+        laneStats.forEach(s => { if (s.champion) map[s.champion] = (map[s.champion] || 0) + 1; });
+        return Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0];
+      })();
+
+      return {
+        nickname, games: count, mostChamp,
+        dpm:     Math.round(tDmg / safeM),
+        dtpm:    Math.round(tDmgTaken / safeM),
+        gpm:     Math.round(tGold / safeM),
+        cspm:    parseFloat((tCs / safeM).toFixed(2)),
+        avgVs:   parseFloat((tVis / count).toFixed(1)),
+        kda:     kdaNum,
+        kdaStr:  tD === 0 ? 'Perfect' : kdaNum.toFixed(2),
+        winRate: Math.round((tWins / count) * 100),
+        kp:      Math.round((tKpSum / count) * 100),
+        dpg:     tGold > 0 ? parseFloat((tDmg / tGold).toFixed(2)) : 0,
+      };
+    }).filter(Boolean);
+  })();
+
+  const sorted = [...rankings].sort((a, b) => b[selectedMetric] - a[selectedMetric]);
+  const metricInfo = metrics.find(m => m.id === selectedMetric);
+
+  const medalColor = (i) => ['#fbbf24', '#94a3b8', '#b45309'][i] ?? null;
+  const medalEmoji = (i) => ['🥇', '🥈', '🥉'][i] ?? null;
+
+  const formatVal = (row) => {
+    if (selectedMetric === 'kda') return row.kdaStr;
+    if (selectedMetric === 'winRate' || selectedMetric === 'kp') return `${row[selectedMetric]}%`;
+    return typeof row[selectedMetric] === 'number' ? row[selectedMetric].toLocaleString() : row[selectedMetric];
+  };
+
+  return (
+    <div>
+      {/* 라인 탭 */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        {lanes.map(lane => (
+          <button key={lane} onClick={() => setSelectedLane(lane)} style={{
+            padding: '8px 20px', borderRadius: '10px',
+            border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151',
+            cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', transition: '0.2s',
+            backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827',
+            color: selectedLane === lane ? '#fff' : '#9ca3af'
+          }}>{lane}</button>
+        ))}
+      </div>
+
+      {/* 지표 탭 */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
+        {metrics.map(m => (
+          <button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{
+            padding: '7px 13px', borderRadius: '10px',
+            border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151',
+            cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s',
+            backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827',
+            color: selectedMetric === m.id ? m.color : '#9ca3af'
+          }}>
+            {m.label}
+            <span style={{ fontSize: '11px', opacity: 0.6, marginLeft: '4px' }}>{m.desc}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 순위 리스트 */}
+      {sorted.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
+          <p>해당 라인 데이터가 없습니다</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px'}}>
+          {sorted.map((row, i) => {
+            const medal = medalColor(i);
+            const isTop3 = i < 3;
+            return (
+              <div key={row.nickname} style={{
+                display: 'flex', alignItems: 'center', gap: '16px',
+                backgroundColor: isTop3 ? `${medal}11` : i % 2 === 0 ? '#1a2030' : '#1f2937',
+                borderRadius: '14px', padding: '14px 24px',
+                border: isTop3 ? `1px solid ${medal}55` : '1px solid #374151',
+              }}>
+                {/* 순위 */}
+                <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>
+                  {isTop3
+                    ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span>
+                    : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>
+                  }
+                </div>
+
+                {/* 챔피언 아이콘 */}
+                <img
+                  src={getChampImgUrl(row.mostChamp)}
+                  alt=""
+                  style={{
+                    width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0,
+                    border: `2px solid ${medal || '#374151'}`
+                  }}
+                />
+
+                {/* 닉네임 + 정보 */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#fff' }}>{row.nickname}</div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>
+                    {getChampKoName(row.mostChamp)} · {row.games}경기 · 승률
+                    <span style={{ color: row.winRate >= 50 ? '#60a5fa' : '#f87171', fontWeight: 'bold', marginLeft: '4px' }}>
+                      {row.winRate}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 지표 값 */}
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: '22px', fontWeight: '900', color: metricInfo.color }}>{formatVal(row)}</div>
+                  <div style={{ fontSize: '11px', color: '#6b7280' }}>{metricInfo.desc}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+/* =====================================================
    메인 앱
    ===================================================== */
 function App() {
@@ -1135,6 +1318,7 @@ function App() {
             { id: 'champion', label: '⚔️ 챔피언 분석' },
             { id: 'player', label: `👤 개인 지표${selectedPlayer ? ` · ${selectedPlayer.nickname}` : ''}` },
             { id: 'h2h', label: '🆚 상대 전적' },
+            { id: 'leaderboard', label: '🏆 리더보드' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -1396,7 +1580,13 @@ function App() {
     />
   </section>
 )}
-
+{/* ===== 리더보드 탭 ===== */}
+{mainTab === 'leaderboard' && (
+  <section style={{ backgroundColor: '#1f2937', padding: '35px', borderRadius: '16px', border: '1px solid #374151' }}>
+    <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#ffffff', marginBottom: '24px' }}>🏆 라인별 리더보드</h2>
+    <Leaderboard allStats={allStats} matches={matches} />
+  </section>
+)}
       </div>
     </div>
   );
