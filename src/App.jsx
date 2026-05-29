@@ -351,61 +351,110 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
       </div>
 
       {/* 모스트 픽 & 밴 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
-        <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
-          <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '15px 15px 0' }}>🔝 MOST PICKED</h3>
-          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            {(() => {
-              const counts = {};
-              const sourceList = (currentData?.history && currentData.history.length > 0) ? currentData.history : (selectedPlayer?.fullHistory || []);
-              sourceList.forEach(h => {
-                const name = h.champion || h.champ || h.champion_name || h.championName || h.name || h.champName;
-                if (name && name !== "undefined") counts[name] = (counts[name] || 0) + 1;
-              });
-              const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3);
-              return sorted.length > 0 ? sorted.map(([name, count]) => (
-                <div key={name} onClick={() => setSelectedChampion(selectedChampion === name ? null : name)} style={{ textAlign: 'center', cursor: 'pointer', opacity: selectedChampion && selectedChampion !== name ? 0.4 : 1, transform: selectedChampion === name ? 'scale(1.1)' : 'scale(1)', transition: '0.2s' }}>
-                  <img src={getChampImgUrl(name)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: selectedChampion === name ? '2px solid #fbbf24' : '1px solid #374151', boxShadow: selectedChampion === name ? '0 0 10px rgba(251, 191, 36, 0.5)' : 'none' }} alt={name} />
-                  <p style={{ fontSize: '11px', color: '#fff', marginTop: '6px', fontWeight: 'bold' }}>{getChampKoName(name)}</p>
-                  <p style={{ fontSize: '10px', color: '#9ca3af' }}>{count}회</p>
-                </div>
-              )) : <p style={{ color: '#4b5563', fontSize: '12px' }}>데이터 없음</p>;
-            })()}
-          </div>
-        </div>
-        <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
-          <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '15px 15px 0' }}>🚫 MOST BANNED</h3>
-          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            {(() => {
-              const banCounts = {};
-              const matchesArr = matches || [];
-              const history = (currentData?.history && currentData.history.length > 0) ? currentData.history : (selectedPlayer?.fullHistory || []);
-              history.forEach(h => {
-                const mId = h.match_id || h.matchId || h.id;
-                const match = matchesArr.find(m => String(m.id) === String(mId));
-                if (match) {
-                  const myCurrentSide = (h.side || (h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue'))).toLowerCase();
-                  const opponentBans = myCurrentSide.includes('blue') ? (match.red_bans || []) : (match.blue_bans || []);
-                  opponentBans.forEach(b => {
-                    if (!b.target || !b.champ) return;
-                    const bTarget = String(b.target).toUpperCase().trim();
-                    const pLane = String(h.lane || "").toUpperCase().trim();
-                    if (bTarget === pLane) banCounts[b.champ] = (banCounts[b.champ] || 0) + 1;
-                  });
-                }
-              });
-              const sortedBans = Object.entries(banCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
-              return sortedBans.length > 0 ? sortedBans.map(([name, count]) => (
-                <div key={name} style={{ textAlign: 'center' }}>
-                  <img src={getChampImgUrl(name)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: '1px solid #ef4444', filter: 'grayscale(0.8)' }} alt={name} />
-                  <p style={{ fontSize: '11px', color: '#fff', marginTop: '6px', fontWeight: 'bold' }}>{getChampKoName(name)}</p>
-                  <p style={{ fontSize: '10px', color: '#ef4444' }}>{count}회 밴</p>
-                </div>
-              )) : <p style={{ color: '#4b5563', fontSize: '12px', textAlign: 'center', width: '100%' }}>저격 밴 없음</p>;
-            })()}
-          </div>
-        </div>
-      </div>
+<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
+  <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
+    <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '15px 15px 0' }}>🔝 MOST PICKED</h3>
+    <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+      {(() => {
+        const fullHistory = selectedLine === 'ALL'
+          ? (selectedPlayer?.fullHistory || [])
+          : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
+        const totalGames = fullHistory.length || 1;
+        const history = (currentData?.history && currentData.history.length > 0) ? currentData.history : fullHistory;
+        const matchesArr = matches || [];
+
+        const counts = {};
+        history.forEach(h => {
+          const name = h.champion || h.champ || h.champion_name || h.championName || h.name || h.champName;
+          if (name && name !== 'undefined') counts[name] = (counts[name] || 0) + 1;
+        });
+
+        const banCounts = {};
+        fullHistory.forEach(h => {
+          const mId = h.match_id || h.matchId || h.id;
+          const match = matchesArr.find(m => String(m.id) === String(mId));
+          if (!match) return;
+          const mySide = (h.side || (h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue'))).toLowerCase();
+          const opponentBans = mySide.includes('blue') ? (match.red_bans || []) : (match.blue_bans || []);
+          const myLane = String(h.lane || '').toUpperCase().trim();
+          opponentBans.forEach(b => {
+            if (!b.champ) return;
+            if (String(b.target || '').toUpperCase().trim() !== myLane) return;
+            banCounts[b.champ] = (banCounts[b.champ] || 0) + 1;
+          });
+        });
+
+        const sortedPicks = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+        return sortedPicks.length > 0 ? sortedPicks.map(([name, count]) => {
+          const banRate = Math.round(((banCounts[name] || 0) + (counts[name] || 0)) / totalGames * 100);
+          const isSignature = banRate > 50 && totalGames >= 5;
+          return (
+            <div key={name} onClick={() => setSelectedChampion(selectedChampion === name ? null : name)} style={{ textAlign: 'center', cursor: 'pointer', opacity: selectedChampion && selectedChampion !== name ? 0.4 : 1, transform: selectedChampion === name ? 'scale(1.1)' : 'scale(1)', transition: '0.2s' }}>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img src={getChampImgUrl(name)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: isSignature ? '2px solid #f97316' : selectedChampion === name ? '2px solid #fbbf24' : '1px solid #374151', boxShadow: isSignature ? '0 0 10px rgba(249,115,22,0.5)' : selectedChampion === name ? '0 0 10px rgba(251,191,36,0.5)' : 'none' }} alt={name} />
+                {isSignature && <div style={{ position: 'absolute', top: '-5px', right: '-5px', backgroundColor: '#f97316', borderRadius: '50%', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px' }}>✦</div>}
+              </div>
+              <p style={{ fontSize: '11px', color: '#fff', marginTop: '6px', fontWeight: 'bold' }}>{getChampKoName(name)}</p>
+              <p style={{ fontSize: '10px', color: '#9ca3af' }}>{count}회</p>
+            </div>
+          );
+        }) : <p style={{ color: '#4b5563', fontSize: '12px' }}>데이터 없음</p>;
+      })()}
+    </div>
+  </div>
+
+  <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
+    <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '15px 15px 0' }}>🚫 MOST BANNED</h3>
+    <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+      {(() => {
+        const fullHistory = selectedLine === 'ALL'
+          ? (selectedPlayer?.fullHistory || [])
+          : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
+        const totalGames = fullHistory.length || 1;
+        const matchesArr = matches || [];
+
+        const counts = {};
+        fullHistory.forEach(h => {
+          const name = h.champion || h.champ || h.champion_name || h.championName || h.name || h.champName;
+          if (name && name !== 'undefined') counts[name] = (counts[name] || 0) + 1;
+        });
+
+        const banCounts = {};
+        fullHistory.forEach(h => {
+          const mId = h.match_id || h.matchId || h.id;
+          const match = matchesArr.find(m => String(m.id) === String(mId));
+          if (!match) return;
+          const mySide = (h.side || (h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue'))).toLowerCase();
+          const opponentBans = mySide.includes('blue') ? (match.red_bans || []) : (match.blue_bans || []);
+          const myLane = String(h.lane || '').toUpperCase().trim();
+          opponentBans.forEach(b => {
+            if (!b.champ) return;
+            if (String(b.target || '').toUpperCase().trim() !== myLane) return;
+            banCounts[b.champ] = (banCounts[b.champ] || 0) + 1;
+          });
+        });
+
+        const sortedBans = Object.entries(banCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+        return sortedBans.length > 0 ? sortedBans.map(([name, count]) => {
+          const banRate = Math.round(((banCounts[name] || 0) + (counts[name] || 0)) / totalGames * 100);
+          const isSignature = banRate > 50 && totalGames >= 5;
+          return (
+            <div key={name} style={{ textAlign: 'center' }}>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img src={getChampImgUrl(name)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: isSignature ? '2px solid #f97316' : '1px solid #ef4444', filter: 'grayscale(0.8)', boxShadow: isSignature ? '0 0 10px rgba(249,115,22,0.5)' : 'none' }} alt={name} />
+                {isSignature && <div style={{ position: 'absolute', top: '-5px', right: '-5px', backgroundColor: '#f97316', borderRadius: '50%', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px' }}>✦</div>}
+              </div>
+              <p style={{ fontSize: '11px', color: '#fff', marginTop: '6px', fontWeight: 'bold' }}>{getChampKoName(name)}</p>
+              <p style={{ fontSize: '10px', color: '#ef4444' }}>{count}회 밴</p>
+            </div>
+          );
+        }) : <p style={{ color: '#4b5563', fontSize: '12px', textAlign: 'center', width: '100%' }}>저격 밴 없음</p>;
+      })()}
+    </div>
+  </div>
+</div>
 
       {/* 추이 그래프 & 레이더 */}
       <div style={{ display: 'grid', gridTemplateColumns: selectedLine === 'ALL' ? '1fr' : '1.2fr 0.8fr', gap: '20px' }}>
