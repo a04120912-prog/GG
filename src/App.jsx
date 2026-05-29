@@ -1219,8 +1219,11 @@ function App() {
     if (!allStats.length || !currentData) return null;
     const lineStats = line === 'ALL' ? allStats : allStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
     const nicknames = [...new Set(lineStats.map(s => s.nickname))];
+    const myGames = lineStats.filter(s => s.nickname === nickname).length;
+    if (myGames < 5) return null;
     const otherAverages = nicknames.filter(name => name !== nickname).map(name => {
       const pHistory = lineStats.filter(s => s.nickname === name);
+      if (pHistory.length < 5) return undefined;
       let tMin = 0, tDmg = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0;
       let tDtpm = 0, tDmgShare = 0, tFB = 0, tCW = 0, tKpSum = 0;
       pHistory.forEach(s => {
@@ -1245,7 +1248,7 @@ function App() {
         avgKp: (tKpSum / (pHistory.length || 1)) * 100
       };
       return stats[field];
-    });
+    }).filter(v => v !== undefined);
     let myVal = currentData[field];
     if (myVal === undefined) {
       const shortKey = field.replace('avg', '').toLowerCase();
