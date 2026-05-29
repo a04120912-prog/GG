@@ -443,7 +443,7 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
           return (
             <div key={name} style={{ textAlign: 'center' }}>
               <div style={{ position: 'relative', display: 'inline-block' }}>
-                <img src={getChampImgUrl(name)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: isSignature ? '2px solid #f97316' : '1px solid #ef4444', filter: 'grayscale(0.8)', boxShadow: isSignature ? '0 0 10px rgba(249,115,22,0.5)' : 'none' }} alt={name} />
+                <img src={getChampImgUrl(name)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: isSignature ? '2px solid #f97316' : '1px solid #ef4444', filter: isSignature ? 'none' : 'grayscale(0.8)', boxShadow: isSignature ? '0 0 10px rgba(249,115,22,0.5)' : 'none' }} alt={name} />
                 {isSignature && <div style={{ position: 'absolute', top: '-5px', right: '-5px', backgroundColor: '#f97316', borderRadius: '50%', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>✦</div>}
               </div>
               <p style={{ fontSize: '11px', color: '#fff', marginTop: '6px', fontWeight: 'bold' }}>{getChampKoName(name)}</p>
