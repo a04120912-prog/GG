@@ -1222,46 +1222,27 @@ function App() {
     const nicknames = [...new Set(lineStats.map(s => s.nickname))];
     const myGames = lineStats.filter(s => s.nickname === nickname).length;
     if (myGames < 5) return null;
+
     const otherAverages = nicknames.filter(name => name !== nickname).map(name => {
       const pHistory = lineStats.filter(s => s.nickname === name);
       if (pHistory.length < 5) return undefined;
-      let tMin = 0, tDmg = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0;
-      let tDtpm = 0, tDmgShare = 0, tFB = 0, tCW = 0, tKpSum = 0;
+      let tMin = 0, tDmg = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0, tDtpm = 0, tDmgShare = 0, tFB = 0, tCW = 0, tKpSum = 0;
       pHistory.forEach(s => {
-        const [min, sec] = (s.matches?.duration || "20:00").split(':').map(Number);
-        const m = min + (sec / 60) || 20; tMin += m;
-        tDmg += Number(s.damage || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0);
-        tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0);
-        tDtpm += Number(s.damage_taken || 0); tCW += Number(s.control_wards || 0);
+        const [min, sec] = (s.matches?.duration || '20:00').split(':').map(Number); const m = min + (sec / 60) || 20; tMin += m;
+        tDmg += Number(s.damage || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0); tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0); tDtpm += Number(s.damage_taken || 0); tCW += Number(s.control_wards || 0);
         if (s.first_blood === true || s.first_blood === 'true' || s.first_blood === 1) tFB += 1;
         const teamStats = allStats.filter(st => st.match_id === s.match_id && st.side === s.side);
-        const teamDmg = teamStats.reduce((sum, p) => sum + Number(p.damage || 0), 0);
-        const teamKills = teamStats.reduce((sum, p) => sum + Number(p.kills || 0), 0);
-        tDmgShare += teamDmg > 0 ? (Number(s.damage || 0) / teamDmg) : 0;
-        tKpSum += teamKills > 0 ? ((Number(s.kills || 0) + Number(s.assists || 0)) / teamKills) : 0;
+        const teamDmg = teamStats.reduce((sum, p) => sum + Number(p.damage || 0), 0); const teamKills = teamStats.reduce((sum, p) => sum + Number(p.kills || 0), 0);
+        tDmgShare += teamDmg > 0 ? (Number(s.damage || 0) / teamDmg) : 0; tKpSum += teamKills > 0 ? ((Number(s.kills || 0) + Number(s.assists || 0)) / teamKills) : 0;
       });
-      const stats = {
-        avgDpm: tDmg / (tMin || 1), avgGpm: tGold / (tMin || 1), avgCspm: tCs / (tMin || 1),
-        avgVs: tVis / (pHistory.length || 1), avgDpg: tGold > 0 ? tDmg / tGold : 0,
-        avgKda: tD === 0 ? 99999 : (tK + tA) / tD,
-        avgDtpm: tDtpm / (tMin || 1), avgDmgShare: (tDmgShare / (pHistory.length || 1)) * 100,
-        fbRate: (tFB / (pHistory.length || 1)) * 100, avgControlWards: tCW / (pHistory.length || 1),
-        avgKp: (tKpSum / (pHistory.length || 1)) * 100
-      };
+      const stats = { avgDpm: tDmg / (tMin || 1), avgGpm: tGold / (tMin || 1), avgCspm: tCs / (tMin || 1), avgVs: tVis / (pHistory.length || 1), avgDpg: tGold > 0 ? tDmg / tGold : 0, avgKda: tD === 0 ? 99999 : (tK + tA) / tD, avgDtpm: tDtpm / (tMin || 1), avgDmgShare: (tDmgShare / (pHistory.length || 1)) * 100, fbRate: (tFB / (pHistory.length || 1)) * 100, avgControlWards: tCW / (pHistory.length || 1), avgKp: (tKpSum / (pHistory.length || 1)) * 100 };
       return stats[field];
     }).filter(v => v !== undefined);
     let myVal = currentData[field];
-    if (myVal === undefined) {
-      const shortKey = field.replace('avg', '').toLowerCase();
-      myVal = currentData[shortKey] || currentData[field.replace('avg', 'avg_')] || 0;
-    }
+    if (myVal === undefined) { const shortKey = field.replace('avg', '').toLowerCase(); myVal = currentData[shortKey] || currentData[field.replace('avg', 'avg_')] || 0; }
     let myCurrentScore;
-    if (field === 'avgKda' || field === 'kda') {
-      const isPerfect = (myVal === "Perfect" || String(myVal).includes("Perfect") || (!isFinite(parseFloat(myVal)) && parseFloat(myVal) > 0));
-      myCurrentScore = isPerfect ? 99999 : (parseFloat(String(myVal).replace(/[^0-9.]/g, '')) || 0);
-    } else {
-      myCurrentScore = parseFloat(String(myVal).replace(/[^0-9.]/g, '')) || 0;
-    }
+    if (field === 'avgKda' || field === 'kda') { const isPerfect = (myVal === 'Perfect' || String(myVal).includes('Perfect') || (!isFinite(parseFloat(myVal)) && parseFloat(myVal) > 0)); myCurrentScore = isPerfect ? 99999 : (parseFloat(String(myVal).replace(/[^0-9.]/g, '')) || 0); }
+    else { myCurrentScore = parseFloat(String(myVal).replace(/[^0-9.]/g, '')) || 0; }
     const combined = [...otherAverages, myCurrentScore].sort((a, b) => b - a);
     const rank = combined.indexOf(myCurrentScore) + 1;
     return rank >= 1 && rank <= 3 ? { line: line === 'ALL' ? 'ALL' : line, rank } : null;
