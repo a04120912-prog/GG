@@ -353,7 +353,7 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
       {/* 모스트 픽 & 밴 */}
 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
   <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
-    <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '15px 15px 0' }}>🔝 MOST PICKED</h3>
+    <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🔝 MOST PICKED</h3>
     <div style={{ display: 'flex', justifyContent: 'space-around' }}>
       {(() => {
         const fullHistory = selectedLine === 'ALL'
@@ -405,7 +405,7 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
   </div>
 
   <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
-    <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '5px 15px 0' }}>🚫 MOST BANNED</h3>
+    <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🚫 MOST BANNED</h3>
     <div style={{ display: 'flex', justifyContent: 'space-around' }}>
       {(() => {
         const fullHistory = selectedLine === 'ALL'
