@@ -945,6 +945,7 @@ function Leaderboard({ allStats, matches }) {
     return nicknames.map(nickname => {
       const laneStats = allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname);
       if (laneStats.length === 0) return null;
+      if (laneStats.length < 5) return null;
 
       let tMin = 0, tDmg = 0, tDmgTaken = 0, tGold = 0, tCs = 0, tVis = 0;
       let tK = 0, tA = 0, tD = 0, tWins = 0, tKpSum = 0;
