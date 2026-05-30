@@ -618,7 +618,7 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
 /* =====================================================
    상대 전적 탭
    ===================================================== */
-function HeadToHead({ allStats, matches, onNavigateToPlayer, isMobile }) {
+function HeadToHead({ allStats, matches, onNavigateToPlayer, onNavigateToMatch, isMobile }) {
   const [playerA, setPlayerA] = useState('');
   const [searchA, setSearchA] = useState('');
   const [sortKey, setSortKey] = useState('total');
@@ -649,7 +649,7 @@ function HeadToHead({ allStats, matches, onNavigateToPlayer, isMobile }) {
         if (!rivalMap[opName]) rivalMap[opName] = { nickname: opName, byLane: {} };
         if (!rivalMap[opName].byLane[myLane]) rivalMap[opName].byLane[myLane] = [];
         rivalMap[opName].byLane[myLane].push({
-          matchId, date: match.match_date, duration: match.duration, lane: myLane, myIsWin,
+          matchId, mySide, date: match.match_date, duration: match.duration, lane: myLane, myIsWin,
           my: { champion: s.champion, kills: Number(s.kills || 0), deaths: Number(s.deaths || 0), assists: Number(s.assists || 0), damage: Number(s.damage || 0), gold: Number(s.gold || 0), cs: Number(s.cs || 0), vision_score: Number(s.vision_score || 0), dpm: Math.round(Number(s.damage || 0) / mTotal), gpm: Math.round(Number(s.gold || 0) / mTotal) },
 op: { champion: op.champion, kills: Number(op.kills || 0), deaths: Number(op.deaths || 0), assists: Number(op.assists || 0), damage: Number(op.damage || 0), gold: Number(op.gold || 0), cs: Number(op.cs || 0), vision_score: Number(op.vision_score || 0), dpm: Math.round(Number(op.damage || 0) / mTotal), gpm: Math.round(Number(op.gold || 0) / mTotal) },
         });
@@ -779,127 +779,230 @@ op: { champion: op.champion, kills: Number(op.kills || 0), deaths: Number(op.dea
           </div>
         </div>
         {/* 6각형 레이더 차트 */}
-<div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '20px 24px', border: '1px solid #374151', marginBottom: '20px' }}>
-  <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>🕸️ 능력치 비교</h4>
+<div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '5px 24px', border: '1px solid #374151', marginBottom: '20px' }}>
+  <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>🕸️ 육각형 레이더 비교</h4>
   {(() => {
-    const opNickname = r.nickname;
-    const keys = [
-      { key: 'dpm', label: 'DPM' },
-      { key: 'gpm', label: 'GPM' },
-      { key: 'kda', label: 'KDA' },
-      { key: 'cs', label: 'CS' },
-      { key: 'vs', label: '시야' },
-      { key: 'kp', label: 'KP' },
-    ];
+  const opNickname = r.nickname;
+  const keys = [
+    { key: 'dpm', label: 'DPM' },
+    { key: 'gpm', label: 'GPM' },
+    { key: 'kda', label: 'KDA' },
+    { key: 'cs', label: 'CS' },
+    { key: 'vs', label: '시야' },
+    { key: 'kp', label: 'KP' },
+  ];
 
-    const myRaw = {
-      dpm: st.myAvgDpm,
-      gpm: st.myAvgGpm,
-      kda: st.myKdaNum,
-      cs: parseFloat(st.myAvgCs),
-      vs: st.games ? (st.games.reduce((s, g) => s + (g.my.vision_score || 0), 0) / st.games.length) : 0,
-      kp: st.games ? (st.games.reduce((s, g) => {
-        const teamKills = g.my.kills + g.op.kills;
-        return s + (teamKills > 0 ? (g.my.kills + g.my.assists) / teamKills : 0);
-      }, 0) / st.games.length * 100) : 0,
-    };
-    const opRaw = {
-      dpm: st.opAvgDpm,
-      gpm: st.opAvgGpm,
-      kda: st.opKdaNum,
-      cs: parseFloat(st.opAvgCs),
-      vs: st.games ? (st.games.reduce((s, g) => s + (g.op.vision_score || 0), 0) / st.games.length) : 0,
-      kp: st.games ? (st.games.reduce((s, g) => {
-        const teamKills = g.my.kills + g.op.kills;
-        return s + (teamKills > 0 ? (g.op.kills + g.op.assists) / teamKills : 0);
-      }, 0) / st.games.length * 100) : 0,
-    };
+ const myRaw = {
+  dpm: st.myAvgDpm,
+  gpm: st.myAvgGpm,
+  kda: st.myKdaNum,
+  cs: parseFloat(st.myAvgCs),
+  vs: st.games ? (st.games.reduce((s, g) => s + (g.my.vision_score || 0), 0) / st.games.length) : 0,
+  kp: st.games ? (st.games.reduce((s, g) => {
+    const myTeamKills = allStats
+      .filter(stat => String(stat.match_id) === String(g.matchId) && String(stat.side || '').trim() === String(g.mySide || '').trim())
+      .reduce((sum, stat) => sum + Number(stat.kills || 0), 0);
+    return s + (myTeamKills > 0 ? (g.my.kills + g.my.assists) / myTeamKills : 0);
+  }, 0) / st.games.length * 100) : 0,
+};
 
-    const normalize = (myVal, opVal) => {
-      const max = Math.max(myVal, opVal, 0.001);
-      return [Math.min((myVal / max) * 85, 100), Math.min((opVal / max) * 85, 100)];
-    };
+const opRaw = {
+  dpm: st.opAvgDpm,
+  gpm: st.opAvgGpm,
+  kda: st.opKdaNum,
+  cs: parseFloat(st.opAvgCs),
+  vs: st.games ? (st.games.reduce((s, g) => s + (g.op.vision_score || 0), 0) / st.games.length) : 0,
+  kp: st.games ? (st.games.reduce((s, g) => {
+    const opTeamKills = allStats
+      .filter(stat => String(stat.match_id) === String(g.matchId) && String(stat.side || '').trim() !== String(g.mySide || '').trim())
+      .reduce((sum, stat) => sum + Number(stat.kills || 0), 0);
+    return s + (opTeamKills > 0 ? (g.op.kills + g.op.assists) / opTeamKills : 0);
+  }, 0) / st.games.length * 100) : 0,
+};
+  const normalize = (myVal, opVal) => {
+    const max = Math.max(myVal, opVal, 0.001);
+    return [Math.min((myVal / max) * 85, 100), Math.min((opVal / max) * 85, 100)];
+  };
 
-    const cx = 140, cy = 130, rad = 100; // ← r → rad 로 변경
-    const angleStep = (Math.PI * 2) / 6;
-    const getPoint = (angle, radius) => ({
-      x: cx + radius * Math.sin(angle),
-      y: cy - radius * Math.cos(angle),
-    });
+  const cx = 140, cy = 130, rad = 100;
+  const angleStep = (Math.PI * 2) / 6;
+  const getPoint = (angle, radius) => ({
+    x: cx + radius * Math.sin(angle),
+    y: cy - radius * Math.cos(angle),
+  });
 
-    const myPoints = keys.map((k, i) => {
-      const [myN] = normalize(myRaw[k.key], opRaw[k.key]);
-      return getPoint(angleStep * i, (myN / 100) * rad);
-    });
-    const opPoints = keys.map((k, i) => {
-      const [, opN] = normalize(myRaw[k.key], opRaw[k.key]);
-      return getPoint(angleStep * i, (opN / 100) * rad);
-    });
-    const gridPoints = (ratio) => keys.map((_, i) => getPoint(angleStep * i, rad * ratio));
-    const toPath = (points) => points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + 'Z';
+  const myPoints = keys.map((k, i) => {
+    const [myN] = normalize(myRaw[k.key], opRaw[k.key]);
+    return getPoint(angleStep * i, (myN / 100) * rad);
+  });
+  const opPoints = keys.map((k, i) => {
+    const [, opN] = normalize(myRaw[k.key], opRaw[k.key]);
+    return getPoint(angleStep * i, (opN / 100) * rad);
+  });
+  const gridPoints = (ratio) => keys.map((_, i) => getPoint(angleStep * i, rad * ratio));
+  const toPath = (points) => points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + 'Z';
 
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
+  // ★ 추가: hover 상태
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+
+  const formatRawVal = (key, val) => {
+    if (key === 'kda') return val >= 9999 ? 'Perfect' : val.toFixed(2);
+    if (key === 'kp') return val.toFixed(1) + '%';
+    if (key === 'cs') return val.toFixed(1);
+    if (key === 'dpm' || key === 'gpm') return Math.round(val).toLocaleString();
+    return val.toFixed(1);
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
+      <div style={{ position: 'relative' }}>
         <svg width="280" height="260" style={{ overflow: 'visible' }}>
+          {/* 격자 */}
           {[0.25, 0.5, 0.75, 1].map((ratio, ri) => (
             <polygon key={ri} points={gridPoints(ratio).map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#374151" strokeWidth="1" />
           ))}
+          {/* 축선 */}
           {keys.map((_, i) => {
             const outer = getPoint(angleStep * i, rad);
             return <line key={i} x1={cx} y1={cy} x2={outer.x} y2={outer.y} stroke="#374151" strokeWidth="1" />;
           })}
+          {/* 상대 영역 */}
           <path d={toPath(opPoints)} fill="rgba(239,68,68,0.15)" stroke="#ef4444" strokeWidth="2" />
+          {/* 내 영역 */}
           <path d={toPath(myPoints)} fill="rgba(59,130,246,0.2)" stroke="#3b82f6" strokeWidth="2" />
+          {/* 라벨 */}
           {keys.map((k, i) => {
             const labelPt = getPoint(angleStep * i, rad + 18);
+            const isHovered = hoveredIdx === i;
             return (
-              <text key={i} x={labelPt.x} y={labelPt.y} textAnchor="middle" dominantBaseline="middle" fill="#9ca3af" fontSize="11" fontWeight="bold">{k.label}</text>
+              <text key={i} x={labelPt.x} y={labelPt.y} textAnchor="middle" dominantBaseline="middle"
+                fill={isHovered ? '#fff' : '#9ca3af'} fontSize={isHovered ? '12' : '11'} fontWeight={isHovered ? 'bold' : 'normal'}>
+                {k.label}
+              </text>
+            );
+          })}
+          {/* ★ hover 감지용 투명 원 (꼭짓점마다) */}
+          {keys.map((k, i) => {
+            const outerPt = getPoint(angleStep * i, rad + 18);
+            return (
+              <circle
+                key={`hover-${i}`}
+                cx={outerPt.x}
+                cy={outerPt.y}
+                r={18}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
+              />
             );
           })}
         </svg>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '160px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#3b82f6' }} />
-            <span style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 'bold' }}>{playerA}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#ef4444' }} />
-            <span style={{ fontSize: '13px', color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span>
-          </div>
-          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {keys.map(k => {
-              const myVal = myRaw[k.key];
-              const opVal = opRaw[k.key];
-              const isBetter = myVal >= opVal;
-              const diff = opVal !== 0 ? ((myVal - opVal) / opVal * 100) : 0;
-              const diffStr = diff === 0 ? '동률' : `${isBetter ? '+' : ''}${diff.toFixed(1)}%`;
-              return (
-                <div key={k.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>
-                  <span style={{ color: '#6b7280', width: '26px', flexShrink: 0 }}>{k.label}</span>
-                  <span style={{ color: isBetter ? '#60a5fa' : '#f87171', fontWeight: 'bold', flexShrink: 0 }}>
-                    {isBetter ? '▲' : '▼'} {diffStr}
-                  </span>
-                  <span style={{ fontSize: '10px', flexShrink: 0 }}>
-                    {isBetter
-                      ? <span style={{ color: '#60a5fa' }}>{playerA}</span>
-                      : <span style={{ color: '#f87171' }}>{opNickname}</span>
-                    } 우세
-                  </span>
+
+        {/* ★ 툴팁 */}
+        {hoveredIdx !== null && (() => {
+          const k = keys[hoveredIdx];
+          const myVal = myRaw[k.key];
+          const opVal = opRaw[k.key];
+          const isBetter = myVal >= opVal;
+          const diff = opVal !== 0 ? ((myVal - opVal) / opVal * 100) : 0;
+          const labelPt = getPoint(angleStep * hoveredIdx, rad + 18);
+          // SVG 좌표 → div 위치로 변환 (SVG가 280×260)
+          const tipX = labelPt.x;
+          const tipY = labelPt.y;
+          const leftAlign = tipX < 140;
+          return (
+            <div style={{
+              position: 'absolute',
+              left: tipX + (leftAlign ? -160 : 20),
+              top: tipY - 50,
+              backgroundColor: 'rgba(17,24,39,0.97)',
+              border: '1px solid #3b82f6',
+              borderRadius: '10px',
+              padding: '10px 14px',
+              pointerEvents: 'none',
+              zIndex: 50,
+              minWidth: '150px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#60a5fa', marginBottom: '8px' }}>{k.label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                  <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{playerA}</span>
+                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{formatRawVal(k.key, myVal)}</span>
                 </div>
-              );
-            })}
-          </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                  <span style={{ color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span>
+                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{formatRawVal(k.key, opVal)}</span>
+                </div>
+                <div style={{
+                  marginTop: '4px', paddingTop: '6px', borderTop: '1px solid #374151',
+                  color: isBetter ? '#60a5fa' : '#f87171',
+                  fontWeight: 'bold', textAlign: 'center', fontSize: '11px'
+                }}>
+                  {playerA} {isBetter ? `+${Math.abs(diff).toFixed(1)}% ▲` : `-${Math.abs(diff).toFixed(1)}% ▼`}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* 범례 + 수치 비교 (기존 그대로) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '160px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#3b82f6' }} />
+          <span style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 'bold' }}>{playerA}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#ef4444' }} />
+          <span style={{ fontSize: '13px', color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span>
+        </div>
+        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {keys.map(k => {
+            const myVal = myRaw[k.key];
+            const opVal = opRaw[k.key];
+            const isBetter = myVal >= opVal;
+            const diff = opVal !== 0 ? ((myVal - opVal) / opVal * 100) : 0;
+            const diffStr = diff === 0 ? '동률' : `${isBetter ? '+' : ''}${diff.toFixed(1)}%`;
+            return (
+              <div key={k.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                <span style={{ color: '#6b7280', width: '26px', flexShrink: 0 }}>{k.label}</span>
+                <span style={{ color: isBetter ? '#60a5fa' : '#f87171', fontWeight: 'bold', flexShrink: 0 }}>
+                  {isBetter ? '▲' : '▼'} {diffStr}
+                </span>
+                <span style={{ fontSize: '10px', flexShrink: 0 }}>
+                  {isBetter
+                    ? <span style={{ color: '#60a5fa' }}>{playerA}</span>
+                    : <span style={{ color: '#f87171' }}>{opNickname}</span>
+                  } 우세
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
-    );
-  })()}
+    </div>
+  );
+})()}
 </div>
         {/* 경기 목록 */}
-        <div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '20px 24px', border: '1px solid #374151' }}>
+        <div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '0px 24px', border: '1px solid #374151' }}>
           <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '16px' }}>🗂️ 경기 목록</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {st.games.map((g, gi) => (
-              <div key={gi} style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '12px', backgroundColor: '#111827', borderRadius: '10px', padding: '12px 16px', border: '1px solid #374151' }}>
+              <div
+    key={gi}
+    onClick={() => onNavigateToMatch(g.matchId)}   // ← 추가
+    style={{
+      display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
+      gap: '12px', backgroundColor: '#111827', borderRadius: '10px',
+      padding: '12px 16px', border: '1px solid #374151',
+      cursor: 'pointer', transition: '0.15s'          // ← cursor 추가
+    }}
+    onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}   // ← 추가
+    onMouseLeave={e => e.currentTarget.style.borderColor = '#374151'}   // ← 추가
+  >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <img src={getChampImgUrl(g.my.champion)} style={{ width: '34px', height: '34px', borderRadius: '7px', border: `2px solid ${g.myIsWin ? '#3b82f6' : '#374151'}` }} alt="" />
                   <div>
@@ -1617,11 +1720,25 @@ function App() {
 
         {/* ===== 상대 전적 ===== */}
         {mainTab === 'h2h' && (
-          <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
-            <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>🆚 상대 전적</h2>
-            <HeadToHead allStats={allStats} matches={matches} onNavigateToPlayer={nickname => handlePlayerClick(nickname, true)} isMobile={isMobile} />
-          </section>
-        )}
+  <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
+    <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>🆚 상대 전적</h2>
+    <HeadToHead
+      allStats={allStats}
+      matches={matches}
+      onNavigateToPlayer={nickname => handlePlayerClick(nickname, true)}
+      onNavigateToMatch={(matchId) => {
+        setSelectedMatchId(matchId);
+        fetchMatchStats(matchId);
+        setMainTab('search');
+        const targetDate = matches.find(m => String(m.id) === String(matchId))?.match_date;
+        if (targetDate) setOpenDates(prev => ({ ...prev, [targetDate]: true }));
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+      }}
+      isMobile={isMobile}
+    />
+  </section>
+)}
+
 
         {/* ===== 리더보드 ===== */}
         {mainTab === 'leaderboard' && (
