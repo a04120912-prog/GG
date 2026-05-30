@@ -474,6 +474,73 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
         </div>
       </div>
 
+      {/* 함께할 때 좋은 팀원 */}
+<div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151', marginBottom: '25px' }}>
+  <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🤝 BEST TEAMMATES</h3>
+  <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+    {(() => {
+      const fullHistory = selectedLine === 'ALL'
+        ? (selectedPlayer?.fullHistory || [])
+        : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
+      const matchesArr = matches || [];
+      const teammateMap = {};
+
+      fullHistory.forEach(h => {
+        const mId = h.match_id || h.matchId || h.id;
+        const match = matchesArr.find(m => String(m.id) === String(mId));
+        if (!match) return;
+        const mySide = (h.side || (h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue'))).toLowerCase();
+        const teammates = allStats.filter(s =>
+          String(s.match_id) === String(mId) &&
+          s.nickname !== selectedPlayer.nickname &&
+          String(s.side || '').toLowerCase() === mySide
+        );
+        teammates.forEach(t => {
+          if (!teammateMap[t.nickname]) teammateMap[t.nickname] = { wins: 0, losses: 0 };
+          if (h.isWin) teammateMap[t.nickname].wins++;
+          else teammateMap[t.nickname].losses++;
+        });
+      });
+
+      const sorted = Object.entries(teammateMap)
+        .map(([nickname, { wins, losses }]) => {
+          const champMap = {};
+          allStats.filter(s => s.nickname === nickname).forEach(s => {
+            if (s.champion) champMap[s.champion] = (champMap[s.champion] || 0) + 1;
+          });
+          const mostChamp = Object.entries(champMap).sort((a, b) => b[1] - a[1])[0]?.[0];
+          return { nickname, wins, losses, total: wins + losses, winRate: Math.round((wins / (wins + losses)) * 100), mostChamp };
+        })
+        .filter(t => t.total >= 4)
+        .sort((a, b) => b.winRate - a.winRate || b.total - a.total)
+        .slice(0, 3);
+
+      if (sorted.length === 0) return <p style={{ color: '#4b5563', fontSize: '12px', textAlign: 'center', width: '100%' }}>데이터 없음</p>;
+
+      return sorted.map((t, i) => {
+        const winColor = t.winRate >= 60 ? '#34d399' : t.winRate >= 50 ? '#60a5fa' : '#f87171';
+        const medals = ['🥇', '🥈', '🥉'];
+        return (
+          <div key={t.nickname} style={{ textAlign: 'center' }}>
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: '4px' }}>
+              <img src={getChampImgUrl(t.mostChamp)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: `2px solid ${winColor}`, boxShadow: `0 0 10px ${winColor}44` }} alt={t.mostChamp} />
+              <div style={{ position: 'absolute', top: '-8px', left: '-8px', fontSize: '18px' }}>{medals[i]}</div>
+            </div>
+            <p style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', marginBottom: '2px' }}>{t.nickname}</p>
+            <p style={{ fontSize: '13px', fontWeight: 'bold', color: winColor, marginBottom: '2px' }}>{t.winRate}%</p>
+            <p style={{ fontSize: '10px', color: '#6b7280' }}>
+              <span style={{ color: '#60a5fa' }}>{t.wins}승</span>
+              <span style={{ color: '#4b5563', margin: '0 3px' }}>/</span>
+              <span style={{ color: '#f87171' }}>{t.losses}패</span>
+              <span style={{ color: '#4b5563', marginLeft: '3px' }}>({t.total}경기)</span>
+            </p>
+          </div>
+        );
+      });
+    })()}
+  </div>
+</div>
+
       {/* 추이 그래프 & 레이더 */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (selectedLine === 'ALL' ? '1fr' : '1.2fr 0.8fr'), gap: '20px' }}>
         <div style={{ backgroundColor: '#111827', padding: isMobile ? '16px' : '25px', borderRadius: '16px' }}>
@@ -805,6 +872,7 @@ function HeadToHead({ allStats, matches, onNavigateToPlayer, isMobile }) {
 function Leaderboard({ allStats, matches, isMobile }) {
   const [selectedLane, setSelectedLane] = useState('TOP');
   const [selectedMetric, setSelectedMetric] = useState('dpm');
+  const [mode, setMode] = useState('avg'); // 'avg' | 'total'
 
   const lanes = ['TOP', 'JNG', 'MID', 'ADC', 'SUP'];
   const metrics = [
@@ -818,14 +886,23 @@ function Leaderboard({ allStats, matches, isMobile }) {
     { id: 'kp', label: 'KP%', color: '#f472b6', desc: '킬 관여율' },
     { id: 'dpg', label: '딜/골드', color: '#ec4899', desc: '골드당 데미지' },
   ];
+  const totalMetrics = [
+    { id: 'totalKills', label: '⚔️ 총 킬', color: '#f87171', unit: '킬' },
+    { id: 'totalAssists', label: '🤝 총 어시스트', color: '#34d399', unit: '어시' },
+    { id: 'totalWins', label: '🏆 총 승리', color: '#60a5fa', unit: '승' },
+    { id: 'totalFB', label: '🩸 퍼스트블러드', color: '#f59e0b', unit: '회' },
+    { id: 'totalMultiKills', label: '💥 다중킬 점수', color: '#a78bfa', unit: 'pt' },
+  ];
+  const [selectedTotal, setSelectedTotal] = useState('totalKills');
+  const [totalScope, setTotalScope] = useState('total');
 
   const normalizeLane = (raw) => { const u = String(raw || '').toUpperCase().trim(); const map = { 'JUNGLE': 'JNG', 'BOT': 'ADC', 'SUPPORT': 'SUP' }; return map[u] || u; };
 
+  // 평균 지표 랭킹
   const rankings = (() => {
     const nicknames = [...new Set(allStats.map(s => s.nickname))];
     return nicknames.map(nickname => {
       const laneStats = allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname);
-      if (laneStats.length === 0) return null;
       if (laneStats.length < 5) return null;
       let tMin = 0, tDmg = 0, tDmgTaken = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0, tWins = 0, tKpSum = 0;
       const count = laneStats.length;
@@ -845,8 +922,37 @@ function Leaderboard({ allStats, matches, isMobile }) {
     }).filter(Boolean);
   })();
 
-  const sorted = [...rankings].sort((a, b) => b[selectedMetric] - a[selectedMetric]);
+  // 누적 기록 랭킹
+  const totalRankings = (() => {
+    const nicknames = [...new Set(allStats.map(s => s.nickname))];
+    return nicknames.map(nickname => {
+      const stats = totalScope === 'lane'
+  ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname)
+  : allStats.filter(s => s.nickname === nickname);
+      if (stats.length === 0) return null;
+      const totalKills = stats.reduce((sum, s) => sum + Number(s.kills || 0), 0);
+      const totalAssists = stats.reduce((sum, s) => sum + Number(s.assists || 0), 0);
+      const totalWins = stats.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length;
+      const totalFB = stats.filter(s => s.first_blood === true || s.first_blood === 'true' || s.first_blood === 1).length;
+      const multiKillMap = { Penta: 0, Quadra: 0, Triple: 0, Double: 0 };
+      stats.forEach(s => {
+        const mk = s.multi_kill;
+        if (!mk || mk === 'None' || mk === '0' || mk === 0) return;
+        if (mk === 5 || mk === 'Penta') multiKillMap.Penta++;
+        else if (mk === 4 || mk === 'Quadra') multiKillMap.Quadra++;
+        else if (mk === 3 || mk === 'Triple') multiKillMap.Triple++;
+        else if (mk === 2 || mk === 'Double') multiKillMap.Double++;
+      });
+      const totalMultiKills = multiKillMap.Penta * 5 + multiKillMap.Quadra * 4 + multiKillMap.Triple * 3 + multiKillMap.Double * 2;
+      const mostChamp = (() => { const map = {}; stats.forEach(s => { if (s.champion) map[s.champion] = (map[s.champion] || 0) + 1; }); return Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0]; })();
+      return { nickname, games: stats.length, mostChamp, totalKills, totalAssists, totalWins, totalFB, totalMultiKills, multiKillMap };
+    }).filter(Boolean);
+  })();
+
+  const sortedAvg = [...rankings].sort((a, b) => b[selectedMetric] - a[selectedMetric]);
+  const sortedTotal = [...totalRankings].sort((a, b) => b[selectedTotal] - a[selectedTotal]);
   const metricInfo = metrics.find(m => m.id === selectedMetric);
+  const totalInfo = totalMetrics.find(m => m.id === selectedTotal);
   const medalColor = (i) => ['#fbbf24', '#94a3b8', '#b45309'][i] ?? null;
   const medalEmoji = (i) => ['🥇', '🥈', '🥉'][i] ?? null;
   const formatVal = (row) => {
@@ -857,46 +963,125 @@ function Leaderboard({ allStats, matches, isMobile }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {lanes.map(lane => (
-          <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: isMobile ? '7px 14px' : '8px 20px', borderRadius: '10px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af' }}>{lane}</button>
-        ))}
+      {/* 모드 전환 버튼 */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <button onClick={() => setMode('avg')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'avg' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'avg' ? '#1e3a5f' : '#111827', color: mode === 'avg' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>
+          📊 평균 지표
+        </button>
+        <button onClick={() => setMode('total')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'total' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'total' ? '#431407' : '#111827', color: mode === 'total' ? '#f97316' : '#9ca3af', transition: '0.2s' }}>
+          🎖️ 누적 기록
+        </button>
       </div>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
-        {metrics.map(m => (
-          <button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827', color: selectedMetric === m.id ? m.color : '#9ca3af' }}>
-            {m.label}
-            {!isMobile && <span style={{ fontSize: '11px', opacity: 0.6, marginLeft: '4px' }}>{m.desc}</span>}
-          </button>
-        ))}
-      </div>
-      {sorted.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>해당 라인 데이터가 없습니다</p></div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {sorted.map((row, i) => {
-            const medal = medalColor(i); const isTop3 = i < 3;
-            return (
-              <div key={row.nickname} style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: isTop3 ? `${medal}11` : i % 2 === 0 ? '#1a2030' : '#1f2937', borderRadius: '14px', padding: isMobile ? '12px 14px' : '14px 24px', border: isTop3 ? `1px solid ${medal}55` : '1px solid #374151' }}>
-                <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>
-                  {isTop3 ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span> : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>}
-                </div>
-                <img src={getChampImgUrl(row.mostChamp)} alt="" style={{ width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0, border: `2px solid ${medal || '#374151'}` }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#fff' }}>{row.nickname}</div>
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>
-                    {getChampKoName(row.mostChamp)} · {row.games}경기 · 승률
-                    <span style={{ color: row.winRate >= 50 ? '#60a5fa' : '#f87171', fontWeight: 'bold', marginLeft: '4px' }}>{row.winRate}%</span>
+
+      {/* 라인 필터 */}
+      {mode === 'avg' && (
+  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+    {lanes.map(lane => (
+      <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: isMobile ? '7px 14px' : '8px 20px', borderRadius: '10px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af' }}>{lane}</button>
+    ))}
+  </div>
+)}
+
+      {/* 평균 지표 모드 */}
+      {mode === 'avg' && (
+        <>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
+            {metrics.map(m => (
+              <button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827', color: selectedMetric === m.id ? m.color : '#9ca3af' }}>
+                {m.label}{!isMobile && <span style={{ fontSize: '11px', opacity: 0.6, marginLeft: '4px' }}>{m.desc}</span>}
+              </button>
+            ))}
+          </div>
+          {sortedAvg.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>해당 라인 5경기 이상 데이터가 없습니다</p></div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {sortedAvg.map((row, i) => {
+                const medal = medalColor(i); const isTop3 = i < 3;
+                return (
+                  <div key={row.nickname} style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: isTop3 ? `${medal}11` : i % 2 === 0 ? '#1a2030' : '#1f2937', borderRadius: '14px', padding: isMobile ? '12px 14px' : '14px 24px', border: isTop3 ? `1px solid ${medal}55` : '1px solid #374151' }}>
+                    <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>
+                      {isTop3 ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span> : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>}
+                    </div>
+                    <img src={getChampImgUrl(row.mostChamp)} alt="" style={{ width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0, border: `2px solid ${medal || '#374151'}` }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#fff' }}>{row.nickname}</div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>
+                         {row.games}경기 · 승률
+                        <span style={{ color: row.winRate >= 50 ? '#60a5fa' : '#f87171', fontWeight: 'bold', marginLeft: '4px' }}>{row.winRate}%</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: metricInfo.color }}>{formatVal(row)}</div>
+                      <div style={{ fontSize: '11px', color: '#6b7280' }}>{metricInfo.desc}</div>
+                    </div>
                   </div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: metricInfo.color }}>{formatVal(row)}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7280' }}>{metricInfo.desc}</div>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 누적 기록 모드 */}
+      {mode === 'total' && (
+  <>
+    {/* 라인별/통합 토글 */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+      <button onClick={() => setTotalScope('total')} style={{ padding: '6px 16px', borderRadius: '8px', border: totalScope === 'total' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: totalScope === 'total' ? '#431407' : '#111827', color: totalScope === 'total' ? '#f97316' : '#9ca3af', transition: '0.2s' }}> 통합</button>
+      <button onClick={() => setTotalScope('lane')} style={{ padding: '6px 16px', borderRadius: '8px', border: totalScope === 'lane' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: totalScope === 'lane' ? '#431407' : '#111827', color: totalScope === 'lane' ? '#f97316' : '#9ca3af', transition: '0.2s' }}> 라인별</button>
+      {totalScope === 'lane' && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {lanes.map(lane => (
+            <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>
+          ))}
         </div>
+      )}
+    </div>
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
+            {totalMetrics.map(m => (
+              <button key={m.id} onClick={() => setSelectedTotal(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedTotal === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedTotal === m.id ? `${m.color}22` : '#111827', color: selectedTotal === m.id ? m.color : '#9ca3af' }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {sortedTotal.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>해당 라인 데이터가 없습니다</p></div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {sortedTotal.map((row, i) => {
+                const medal = medalColor(i); const isTop3 = i < 3;
+                const val = row[selectedTotal];
+                return (
+                  <div key={row.nickname} style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: isTop3 ? `${medal}11` : i % 2 === 0 ? '#1a2030' : '#1f2937', borderRadius: '14px', padding: isMobile ? '12px 14px' : '14px 24px', border: isTop3 ? `1px solid ${medal}55` : '1px solid #374151' }}>
+                    <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>
+                      {isTop3 ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span> : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>}
+                    </div>
+                    <img src={getChampImgUrl(row.mostChamp)} alt="" style={{ width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0, border: `2px solid ${medal || '#374151'}` }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#fff' }}>{row.nickname}</div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>
+                        {row.games}경기
+                        {selectedTotal === 'totalMultiKills' && (
+                          <span style={{ marginLeft: '8px' }}>
+                            {row.multiKillMap.Penta > 0 && <span style={{ color: '#f97316', marginRight: '5px' }}>펜타킬 {row.multiKillMap.Penta}</span>}
+                            {row.multiKillMap.Quadra > 0 && <span style={{ color: '#f87171', marginRight: '5px' }}>쿼드라킬 {row.multiKillMap.Quadra}</span>}
+                            {row.multiKillMap.Triple > 0 && <span style={{ color: '#fbbf24', marginRight: '5px' }}>트리플킬 {row.multiKillMap.Triple}</span>}
+                            {row.multiKillMap.Double > 0 && <span style={{ color: '#34d399' }}> 더블킬 {row.multiKillMap.Double}</span>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: totalInfo.color }}>{val.toLocaleString()}</div>
+                      <div style={{ fontSize: '11px', color: '#6b7280' }}>{totalInfo.unit}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
