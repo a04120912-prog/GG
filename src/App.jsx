@@ -949,7 +949,7 @@ const opRaw = {
       </div>
 
       {/* 범례 + 수치 비교 (기존 그대로) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '160px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '160px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#3b82f6' }} />
           <span style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 'bold' }}>{playerA}</span>
@@ -958,7 +958,7 @@ const opRaw = {
           <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#ef4444' }} />
           <span style={{ fontSize: '13px', color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span>
         </div>
-        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {keys.map(k => {
             const myVal = myRaw[k.key];
             const opVal = opRaw[k.key];
