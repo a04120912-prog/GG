@@ -42,6 +42,43 @@ const getChampKoName = (enName) => {
   return enToKoMap[enName.toLowerCase()] || enName;
 };
 
+const getSignatureOrMostChamp = (nickname, allStats, matches) => {
+  const history = allStats.filter(s => s.nickname === nickname);
+  const totalGames = history.length || 1;
+
+  // 픽 횟수
+  const counts = {};
+  history.forEach(s => {
+    if (s.champion) counts[s.champion] = (counts[s.champion] || 0) + 1;
+  });
+
+  // 밴 횟수
+  const banCounts = {};
+  history.forEach(s => {
+    const match = matches.find(m => String(m.id) === String(s.match_id));
+    if (!match) return;
+    const mySide = String(s.side || '').toLowerCase();
+    const opponentBans = mySide.includes('blue') ? (match.red_bans || []) : (match.blue_bans || []);
+    const myLane = String(s.lane || '').toUpperCase().trim();
+    opponentBans.forEach(b => {
+      if (!b.champ) return;
+      if (String(b.target || '').toUpperCase().trim() !== myLane) return;
+      banCounts[b.champ] = (banCounts[b.champ] || 0) + 1;
+    });
+  });
+
+  // 시그니처 챔피언 찾기
+  const signature = Object.entries(counts).find(([name]) => {
+    const banRate = Math.round(((banCounts[name] || 0) + (counts[name] || 0)) / totalGames * 100);
+    return banRate > 50 && totalGames >= 5;
+  });
+
+  if (signature) return signature[0];
+
+  // 없으면 모스트 챔피언
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+};
+
 /* --- 커스텀 툴팁 --- */
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -504,11 +541,7 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
 
       const sorted = Object.entries(teammateMap)
         .map(([nickname, { wins, losses }]) => {
-          const champMap = {};
-          allStats.filter(s => s.nickname === nickname).forEach(s => {
-            if (s.champion) champMap[s.champion] = (champMap[s.champion] || 0) + 1;
-          });
-          const mostChamp = Object.entries(champMap).sort((a, b) => b[1] - a[1])[0]?.[0];
+          const mostChamp = getSignatureOrMostChamp(nickname, allStats, matches);
           return { nickname, wins, losses, total: wins + losses, winRate: Math.round((wins / (wins + losses)) * 100), mostChamp };
         })
         .filter(t => t.total >= 4)
@@ -872,7 +905,10 @@ function HeadToHead({ allStats, matches, onNavigateToPlayer, isMobile }) {
 function Leaderboard({ allStats, matches, isMobile }) {
   const [selectedLane, setSelectedLane] = useState('TOP');
   const [selectedMetric, setSelectedMetric] = useState('dpm');
-  const [mode, setMode] = useState('avg'); // 'avg' | 'total'
+  const [mode, setMode] = useState('avg');
+  const [avgScope, setAvgScope] = useState('lane');
+  const [selectedTotal, setSelectedTotal] = useState('totalKills');
+  const [totalScope, setTotalScope] = useState('total');
 
   const lanes = ['TOP', 'JNG', 'MID', 'ADC', 'SUP'];
   const metrics = [
@@ -893,8 +929,6 @@ function Leaderboard({ allStats, matches, isMobile }) {
     { id: 'totalFB', label: '🩸 퍼스트블러드', color: '#f59e0b', unit: '회' },
     { id: 'totalMultiKills', label: '💥 다중킬 점수', color: '#a78bfa', unit: 'pt' },
   ];
-  const [selectedTotal, setSelectedTotal] = useState('totalKills');
-  const [totalScope, setTotalScope] = useState('total');
 
   const normalizeLane = (raw) => { const u = String(raw || '').toUpperCase().trim(); const map = { 'JUNGLE': 'JNG', 'BOT': 'ADC', 'SUPPORT': 'SUP' }; return map[u] || u; };
 
@@ -902,7 +936,9 @@ function Leaderboard({ allStats, matches, isMobile }) {
   const rankings = (() => {
     const nicknames = [...new Set(allStats.map(s => s.nickname))];
     return nicknames.map(nickname => {
-      const laneStats = allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname);
+      const laneStats = avgScope === 'lane'
+        ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname)
+        : allStats.filter(s => s.nickname === nickname);
       if (laneStats.length < 5) return null;
       let tMin = 0, tDmg = 0, tDmgTaken = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0, tWins = 0, tKpSum = 0;
       const count = laneStats.length;
@@ -917,7 +953,7 @@ function Leaderboard({ allStats, matches, isMobile }) {
         tKpSum += teamKills > 0 ? ((Number(s.kills || 0) + Number(s.assists || 0)) / teamKills) : 0;
       });
       const safeM = tMin || 1; const kdaNum = tD === 0 ? 9999 : (tK + tA) / tD;
-      const mostChamp = (() => { const map = {}; laneStats.forEach(s => { if (s.champion) map[s.champion] = (map[s.champion] || 0) + 1; }); return Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0]; })();
+      const mostChamp = getSignatureOrMostChamp(nickname, allStats, matches);
       return { nickname, games: count, mostChamp, dpm: Math.round(tDmg / safeM), dtpm: Math.round(tDmgTaken / safeM), gpm: Math.round(tGold / safeM), cspm: parseFloat((tCs / safeM).toFixed(2)), avgVs: parseFloat((tVis / count).toFixed(1)), kda: kdaNum, kdaStr: tD === 0 ? 'Perfect' : kdaNum.toFixed(2), winRate: Math.round((tWins / count) * 100), kp: Math.round((tKpSum / count) * 100), dpg: tGold > 0 ? parseFloat((tDmg / tGold).toFixed(2)) : 0 };
     }).filter(Boolean);
   })();
@@ -927,8 +963,8 @@ function Leaderboard({ allStats, matches, isMobile }) {
     const nicknames = [...new Set(allStats.map(s => s.nickname))];
     return nicknames.map(nickname => {
       const stats = totalScope === 'lane'
-  ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname)
-  : allStats.filter(s => s.nickname === nickname);
+        ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname)
+        : allStats.filter(s => s.nickname === nickname);
       if (stats.length === 0) return null;
       const totalKills = stats.reduce((sum, s) => sum + Number(s.kills || 0), 0);
       const totalAssists = stats.reduce((sum, s) => sum + Number(s.assists || 0), 0);
@@ -944,7 +980,7 @@ function Leaderboard({ allStats, matches, isMobile }) {
         else if (mk === 2 || mk === 'Double') multiKillMap.Double++;
       });
       const totalMultiKills = multiKillMap.Penta * 5 + multiKillMap.Quadra * 4 + multiKillMap.Triple * 3 + multiKillMap.Double * 2;
-      const mostChamp = (() => { const map = {}; stats.forEach(s => { if (s.champion) map[s.champion] = (map[s.champion] || 0) + 1; }); return Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0]; })();
+      const mostChamp = getSignatureOrMostChamp(nickname, allStats, matches);
       return { nickname, games: stats.length, mostChamp, totalKills, totalAssists, totalWins, totalFB, totalMultiKills, multiKillMap };
     }).filter(Boolean);
   })();
@@ -973,18 +1009,23 @@ function Leaderboard({ allStats, matches, isMobile }) {
         </button>
       </div>
 
-      {/* 라인 필터 */}
-      {mode === 'avg' && (
-  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-    {lanes.map(lane => (
-      <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: isMobile ? '7px 14px' : '8px 20px', borderRadius: '10px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af' }}>{lane}</button>
-    ))}
-  </div>
-)}
-
       {/* 평균 지표 모드 */}
       {mode === 'avg' && (
         <>
+          {/* 통합/라인별 토글 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <button onClick={() => setAvgScope('total')} style={{ padding: '6px 16px', borderRadius: '8px', border: avgScope === 'total' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: avgScope === 'total' ? '#1e3a5f' : '#111827', color: avgScope === 'total' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>통합</button>
+            <button onClick={() => setAvgScope('lane')} style={{ padding: '6px 16px', borderRadius: '8px', border: avgScope === 'lane' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: avgScope === 'lane' ? '#1e3a5f' : '#111827', color: avgScope === 'lane' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>라인별</button>
+            {avgScope === 'lane' && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {lanes.map(lane => (
+                  <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: isMobile ? '6px 12px' : '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 지표 버튼 */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
             {metrics.map(m => (
               <button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827', color: selectedMetric === m.id ? m.color : '#9ca3af' }}>
@@ -992,8 +1033,9 @@ function Leaderboard({ allStats, matches, isMobile }) {
               </button>
             ))}
           </div>
+
           {sortedAvg.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>해당 라인 5경기 이상 데이터가 없습니다</p></div>
+            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>5경기 이상 데이터가 없습니다</p></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {sortedAvg.map((row, i) => {
@@ -1007,7 +1049,7 @@ function Leaderboard({ allStats, matches, isMobile }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#fff' }}>{row.nickname}</div>
                       <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>
-                         {row.games}경기 · 승률
+                        {row.games}경기 · 승률
                         <span style={{ color: row.winRate >= 50 ? '#60a5fa' : '#f87171', fontWeight: 'bold', marginLeft: '4px' }}>{row.winRate}%</span>
                       </div>
                     </div>
@@ -1025,28 +1067,29 @@ function Leaderboard({ allStats, matches, isMobile }) {
 
       {/* 누적 기록 모드 */}
       {mode === 'total' && (
-  <>
-    {/* 라인별/통합 토글 */}
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-      <button onClick={() => setTotalScope('total')} style={{ padding: '6px 16px', borderRadius: '8px', border: totalScope === 'total' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: totalScope === 'total' ? '#431407' : '#111827', color: totalScope === 'total' ? '#f97316' : '#9ca3af', transition: '0.2s' }}> 통합</button>
-      <button onClick={() => setTotalScope('lane')} style={{ padding: '6px 16px', borderRadius: '8px', border: totalScope === 'lane' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: totalScope === 'lane' ? '#431407' : '#111827', color: totalScope === 'lane' ? '#f97316' : '#9ca3af', transition: '0.2s' }}> 라인별</button>
-      {totalScope === 'lane' && (
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {lanes.map(lane => (
-            <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>
-          ))}
-        </div>
-      )}
-    </div>
-    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <button onClick={() => setTotalScope('total')} style={{ padding: '6px 16px', borderRadius: '8px', border: totalScope === 'total' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: totalScope === 'total' ? '#431407' : '#111827', color: totalScope === 'total' ? '#f97316' : '#9ca3af', transition: '0.2s' }}>통합</button>
+            <button onClick={() => setTotalScope('lane')} style={{ padding: '6px 16px', borderRadius: '8px', border: totalScope === 'lane' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: totalScope === 'lane' ? '#431407' : '#111827', color: totalScope === 'lane' ? '#f97316' : '#9ca3af', transition: '0.2s' }}>라인별</button>
+            {totalScope === 'lane' && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {lanes.map(lane => (
+                  <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
             {totalMetrics.map(m => (
               <button key={m.id} onClick={() => setSelectedTotal(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedTotal === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedTotal === m.id ? `${m.color}22` : '#111827', color: selectedTotal === m.id ? m.color : '#9ca3af' }}>
                 {m.label}
               </button>
             ))}
           </div>
+
           {sortedTotal.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>해당 라인 데이터가 없습니다</p></div>
+            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>데이터가 없습니다</p></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {sortedTotal.map((row, i) => {
@@ -1067,7 +1110,7 @@ function Leaderboard({ allStats, matches, isMobile }) {
                             {row.multiKillMap.Penta > 0 && <span style={{ color: '#f97316', marginRight: '5px' }}>펜타킬 {row.multiKillMap.Penta}</span>}
                             {row.multiKillMap.Quadra > 0 && <span style={{ color: '#f87171', marginRight: '5px' }}>쿼드라킬 {row.multiKillMap.Quadra}</span>}
                             {row.multiKillMap.Triple > 0 && <span style={{ color: '#fbbf24', marginRight: '5px' }}>트리플킬 {row.multiKillMap.Triple}</span>}
-                            {row.multiKillMap.Double > 0 && <span style={{ color: '#34d399' }}> 더블킬 {row.multiKillMap.Double}</span>}
+                            {row.multiKillMap.Double > 0 && <span style={{ color: '#34d399' }}>더블킬 {row.multiKillMap.Double}</span>}
                           </span>
                         )}
                       </div>
