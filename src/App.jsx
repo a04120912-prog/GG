@@ -146,11 +146,12 @@ const Badge = ({ label, color }) => (
 /* =====================================================
    챔피언 분석 탭
    ===================================================== */
-function ChampionAnalysis({ allStats, matches, isMobile }) {
+function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
   const [sortKey, setSortKey] = useState('pickCount');
   const [sortDir, setSortDir] = useState('desc');
   const [laneFilter, setLaneFilter] = useState('ALL');
   const [hoveredChamp, setHoveredChamp] = useState(null);
+  const [expandedChamp, setExpandedChamp] = useState(null);
 
   const champStats = (() => {
     const map = {};
@@ -214,6 +215,100 @@ function ChampionAnalysis({ allStats, matches, isMobile }) {
     });
   })();
 
+  const getChampMatches = (champName) => {
+    return allStats
+      .filter(s => s.champion === champName && (laneFilter === 'ALL' || String(s.lane || '').toUpperCase().trim() === laneFilter))
+      .map(s => {
+        const match = matches.find(m => String(m.id) === String(s.match_id));
+        const mySide = String(s.side || '').trim().toLowerCase();
+        const winSide = String(match?.win_team || '').trim().toLowerCase();
+        const isWin = mySide !== '' && winSide !== '' && mySide === winSide;
+        const [min, sec] = (match?.duration || '20:00').split(':').map(Number);
+        const mTotal = (min || 20) + (sec / 60 || 0);
+        return {
+          matchId: s.match_id,
+          date: match?.match_date || '-',
+          duration: match?.duration || '-',
+          nickname: s.nickname,
+          lane: String(s.lane || '').toUpperCase().trim(),
+          champion: s.champion,
+          isWin,
+          kills: Number(s.kills || 0),
+          deaths: Number(s.deaths || 0),
+          assists: Number(s.assists || 0),
+          dpm: Math.round(Number(s.damage || 0) / mTotal),
+          cs: Number(s.cs || 0),
+        };
+      })
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  };
+
+ const ChampMatchPanel = ({ champName }) => {
+  const champMatches = getChampMatches(champName);
+  return (
+    <div style={{ backgroundColor: '#111827', borderTop: '1px solid #3b82f6', padding: '16px 24px 20px' }}>
+      <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '12px' }}>🗂️ 경기 목록</h4>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+        {champMatches.map((g, i) => (
+          <div
+            key={i}
+            onClick={() => onNavigateToMatch(g.matchId)}
+            onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = '#374151'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              backgroundColor: '#0d1117',
+              borderRadius: '10px',
+              padding: '12px 16px',
+              border: '1px solid #374151',
+              cursor: 'pointer',
+              transition: '0.15s',
+            }}
+          >
+            <img
+              src={getChampImgUrl(g.champion || champName)}
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '7px',
+                border: `2px solid ${g.isWin ? '#3b82f6' : '#374151'}`,
+                flexShrink: 0,
+              }}
+              alt=""
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '11px', color: g.isWin ? '#60a5fa' : '#6b7280', fontWeight: 'bold', marginBottom: '2px' }}>
+                {g.isWin ? '✓ 승리' : '✗ 패배'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {g.nickname} · {g.lane}
+              </div>
+              <div style={{ fontSize: '12px', color: '#d1d5db' }}>
+                {g.kills}/{g.deaths}/{g.assists}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '2px' }}>{g.date}</div>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>{g.duration}</div>
+            </div>
+            {!isMobile && (
+              <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '90px' }}>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>CS {g.cs}</div>
+                <div style={{ fontSize: '12px', color: '#fca5a5', fontWeight: 'bold' }}>{g.dpm.toLocaleString()} DPM</div>
+              </div>
+            )}
+          </div>
+        ))}
+        {champMatches.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '30px', color: '#4b5563' }}>경기 데이터가 없습니다</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
   const sorted = [...champStats].sort((a, b) => {
     const aVal = sortKey === 'kda' ? a.kdaNum : (parseFloat(a[sortKey]) || 0);
     const bVal = sortKey === 'kda' ? b.kdaNum : (parseFloat(b[sortKey]) || 0);
@@ -239,7 +334,7 @@ function ChampionAnalysis({ allStats, matches, isMobile }) {
       <div>
         <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
           {lanes.map(lane => (
-            <button key={lane} onClick={() => setLaneFilter(lane)} style={{ padding: '6px 14px', borderRadius: '8px', border: laneFilter === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: laneFilter === lane ? '#3b82f6' : '#111827', color: laneFilter === lane ? '#fff' : '#9ca3af' }}>{lane}</button>
+            <button key={lane} onClick={() => { setLaneFilter(lane); setExpandedChamp(null); }} style={{ padding: '6px 14px', borderRadius: '8px', border: laneFilter === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: laneFilter === lane ? '#3b82f6' : '#111827', color: laneFilter === lane ? '#fff' : '#9ca3af' }}>{lane}</button>
           ))}
         </div>
         <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
@@ -252,22 +347,30 @@ function ChampionAnalysis({ allStats, matches, isMobile }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {sorted.map((c, i) => {
             const winColor = c.winRate >= 60 ? '#34d399' : c.winRate >= 50 ? '#60a5fa' : c.winRate >= 40 ? '#fbbf24' : '#f87171';
+            const isExpanded = expandedChamp === c.name;
             return (
-              <div key={c.name} style={{ backgroundColor: i % 2 === 0 ? '#1a2030' : '#1f2937', borderRadius: '12px', padding: '12px 14px', border: '1px solid #374151', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img src={getChampImgUrl(c.name)} alt={c.name} style={{ width: '40px', height: '40px', borderRadius: '8px', border: `2px solid ${winColor}`, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{getChampKoName(c.name)}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7280' }}>{c.mostLane} · {c.pickCount}경기</div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '11px', color: winColor, fontWeight: 'bold' }}>{c.winRate}%</span>
-                    <span style={{ fontSize: '11px', color: '#10b981' }}>KDA {c.kda}</span>
-                    <span style={{ fontSize: '11px', color: '#fca5a5' }}>DPM {c.dpm.toLocaleString()}</span>
+              <div key={c.name} style={{ borderRadius: '12px', border: isExpanded ? '1px solid #3b82f6' : '1px solid #374151', overflow: 'hidden' }}>
+                <div
+                  onClick={() => setExpandedChamp(isExpanded ? null : c.name)}
+                  style={{ backgroundColor: isExpanded ? 'rgba(59,130,246,0.1)' : i % 2 === 0 ? '#1a2030' : '#1f2937', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+                >
+                  <img src={getChampImgUrl(c.name)} alt={c.name} style={{ width: '40px', height: '40px', borderRadius: '8px', border: `2px solid ${winColor}`, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{getChampKoName(c.name)}</div>
+                    <div style={{ fontSize: '11px', color: '#6b7280' }}>{c.mostLane} · {c.pickCount}경기</div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: winColor, fontWeight: 'bold' }}>{c.winRate}%</span>
+                      <span style={{ fontSize: '11px', color: '#10b981' }}>KDA {c.kda}</span>
+                      <span style={{ fontSize: '11px', color: '#fca5a5' }}>DPM {c.dpm.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#60a5fa' }}>{c.pickRate}%</div>
+                    <div style={{ fontSize: '10px', color: '#6b7280' }}>픽률</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>{isExpanded ? '▲' : '▼'}</div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#60a5fa' }}>{c.pickRate}%</div>
-                  <div style={{ fontSize: '10px', color: '#6b7280' }}>픽률</div>
-                </div>
+                {isExpanded && <ChampMatchPanel champName={c.name} />}
               </div>
             );
           })}
@@ -281,7 +384,7 @@ function ChampionAnalysis({ allStats, matches, isMobile }) {
     <div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
         {lanes.map(lane => (
-          <button key={lane} onClick={() => setLaneFilter(lane)} style={{ padding: '8px 20px', borderRadius: '10px', border: laneFilter === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', transition: '0.2s', backgroundColor: laneFilter === lane ? '#3b82f6' : '#111827', color: laneFilter === lane ? '#fff' : '#9ca3af' }}>{lane}</button>
+          <button key={lane} onClick={() => { setLaneFilter(lane); setExpandedChamp(null); }} style={{ padding: '8px 20px', borderRadius: '10px', border: laneFilter === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', transition: '0.2s', backgroundColor: laneFilter === lane ? '#3b82f6' : '#111827', color: laneFilter === lane ? '#fff' : '#9ca3af' }}>{lane}</button>
         ))}
         <span style={{ marginLeft: 'auto', color: '#6b7280', fontSize: '13px', alignSelf: 'center' }}>총 {sorted.length}개 챔피언</span>
       </div>
@@ -310,35 +413,60 @@ function ChampionAnalysis({ allStats, matches, isMobile }) {
             {sorted.map((c, i) => {
               const winColor = c.winRate >= 60 ? '#34d399' : c.winRate >= 50 ? '#60a5fa' : c.winRate >= 40 ? '#fbbf24' : '#f87171';
               const isHovered = hoveredChamp === c.name;
+              const isExpanded = expandedChamp === c.name;
               return (
-                <tr key={c.name} onMouseEnter={() => setHoveredChamp(c.name)} onMouseLeave={() => setHoveredChamp(null)} style={{ borderBottom: '1px solid #1f2937', backgroundColor: isHovered ? 'rgba(59,130,246,0.07)' : i % 2 === 0 ? '#1a2030' : '#1f2937', transition: '0.15s' }}>
-                  <td style={{ padding: '10px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ position: 'relative' }}>
-                        <img src={getChampImgUrl(c.name)} alt={c.name} style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${winColor}`, flexShrink: 0 }} />
-                        <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '4px', fontSize: '9px', color: '#9ca3af', padding: '1px 3px', fontWeight: 'bold' }}>{c.mostLane}</div>
+                <>
+                  <tr
+                    key={c.name}
+                    onMouseEnter={() => setHoveredChamp(c.name)}
+                    onMouseLeave={() => setHoveredChamp(null)}
+                    onClick={() => setExpandedChamp(isExpanded ? null : c.name)}
+                    style={{
+                      borderBottom: isExpanded ? 'none' : '1px solid #1f2937',
+                      backgroundColor: isExpanded
+                        ? 'rgba(59,130,246,0.12)'
+                        : isHovered
+                        ? 'rgba(59,130,246,0.07)'
+                        : i % 2 === 0 ? '#1a2030' : '#1f2937',
+                      transition: '0.15s',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <td style={{ padding: '10px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ position: 'relative' }}>
+                          <img src={getChampImgUrl(c.name)} alt={c.name} style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${winColor}`, flexShrink: 0 }} />
+                          <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '4px', fontSize: '9px', color: '#9ca3af', padding: '1px 3px', fontWeight: 'bold' }}>{c.mostLane}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '13px' }}>{getChampKoName(c.name)}</div>
+                          <div style={{ fontSize: '10px', color: '#6b7280' }}>{c.pickCount}경기 </div>
+                        </div>
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '13px' }}>{getChampKoName(c.name)}</div>
-                        <div style={{ fontSize: '10px', color: '#6b7280' }}>{c.pickCount}경기</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ textAlign: 'center', color: '#d1d5db', fontWeight: 'bold' }}>{c.pickCount}</td>
-                  <td style={{ textAlign: 'center', color: '#a78bfa' }}>{c.pickRate}%</td>
-                  <td style={{ textAlign: 'center', color: '#c084fc' }}>{c.banRate}%</td>
-                  <td style={{ textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '6px', backgroundColor: `${winColor}22`, color: winColor, fontWeight: 'bold', fontSize: '13px' }}>{c.winRate}%</span></td>
-                  <td style={{ textAlign: 'center', color: c.kda === 'Perfect' ? '#fbbf24' : '#10b981', fontWeight: 'bold' }}>{c.kda}</td>
-                  <td style={{ textAlign: 'center', color: '#60a5fa' }}>{c.avgKills}</td>
-                  <td style={{ textAlign: 'center', color: '#f87171' }}>{c.avgDeaths}</td>
-                  <td style={{ textAlign: 'center', color: '#34d399' }}>{c.avgAssists}</td>
-                  <td style={{ textAlign: 'center', color: '#fca5a5' }}>{c.dpm.toLocaleString()}</td>
-                  <td style={{ textAlign: 'center', color: '#10b981' }}>{c.dtpm.toLocaleString()}</td>
-                  <td style={{ textAlign: 'center', color: '#fbbf24' }}>{c.gpm.toLocaleString()}</td>
-                  <td style={{ textAlign: 'center', color: '#a78bfa' }}>{c.cspm}</td>
-                  <td style={{ textAlign: 'center', color: '#60a5fa' }}>{c.avgControlWards}</td>
-                  <td style={{ textAlign: 'center', color: '#ec4899' }}>{c.dpg}</td>
-                </tr>
+                    </td>
+                    <td style={{ textAlign: 'center', color: '#d1d5db', fontWeight: 'bold' }}>{c.pickCount}</td>
+                    <td style={{ textAlign: 'center', color: '#a78bfa' }}>{c.pickRate}%</td>
+                    <td style={{ textAlign: 'center', color: '#c084fc' }}>{c.banRate}%</td>
+                    <td style={{ textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '6px', backgroundColor: `${winColor}22`, color: winColor, fontWeight: 'bold', fontSize: '13px' }}>{c.winRate}%</span></td>
+                    <td style={{ textAlign: 'center', color: c.kda === 'Perfect' ? '#fbbf24' : '#10b981', fontWeight: 'bold' }}>{c.kda}</td>
+                    <td style={{ textAlign: 'center', color: '#60a5fa' }}>{c.avgKills}</td>
+                    <td style={{ textAlign: 'center', color: '#f87171' }}>{c.avgDeaths}</td>
+                    <td style={{ textAlign: 'center', color: '#34d399' }}>{c.avgAssists}</td>
+                    <td style={{ textAlign: 'center', color: '#fca5a5' }}>{c.dpm.toLocaleString()}</td>
+                    <td style={{ textAlign: 'center', color: '#10b981' }}>{c.dtpm.toLocaleString()}</td>
+                    <td style={{ textAlign: 'center', color: '#fbbf24' }}>{c.gpm.toLocaleString()}</td>
+                    <td style={{ textAlign: 'center', color: '#a78bfa' }}>{c.cspm}</td>
+                    <td style={{ textAlign: 'center', color: '#60a5fa' }}>{c.avgControlWards}</td>
+                    <td style={{ textAlign: 'center', color: '#ec4899' }}>{c.dpg}</td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${c.name}-detail`}>
+                      <td colSpan={15} style={{ padding: 0, borderBottom: '1px solid #1f2937' }}>
+                        <ChampMatchPanel champName={c.name} />
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
           </tbody>
@@ -352,7 +480,7 @@ function ChampionAnalysis({ allStats, matches, isMobile }) {
             <span style={{ fontSize: '11px', color: '#6b7280' }}>{item.label}</span>
           </div>
         ))}
-        <span style={{ fontSize: '11px', color: '#4b5563', marginLeft: 'auto' }}>* 헤더 클릭 시 정렬 가능</span>
+        <span style={{ fontSize: '11px', color: '#4b5563', marginLeft: 'auto' }}>* 행 클릭 시 출전 경기 확인 / 헤더 클릭 시 정렬</span>
       </div>
     </div>
   );
@@ -1149,6 +1277,123 @@ function Leaderboard({ allStats, matches, isMobile }) {
     { id: 'totalMultiKills', label: '💥 다중킬 점수', color: '#a78bfa', unit: 'pt' },
   ];
 
+  // 단일 경기 기록
+ const recordCategories = [
+  { id: 'longestGame', label: '최장 경기', color: '#60a5fa', unit: '' },
+  { id: 'shortestGame', label: '최단 경기', color: '#34d399', unit: '' },
+  { id: 'mostKills', label: '단일 경기 최다 킬', color: '#f87171', unit: '킬' },
+  { id: 'mostAssists', label: '단일 경기 최다 어시', color: '#34d399', unit: '어시' },
+  { id: 'mostDamage', label: '단일 경기 최다 딜', color: '#fca5a5', unit: '' },
+  { id: 'mostCs', label: '단일 경기 최다 CS', color: '#a78bfa', unit: 'CS' },
+  { id: 'mostGold', label: '단일 경기 최다 골드', color: '#fbbf24', unit: '' },
+  { id: 'mostVision', label: '단일 경기 최다 시야', color: '#38bdf8', unit: '' },
+  { id: 'mostDpm', label: '단일 경기 최고 DPM', color: '#f97316', unit: 'DPM' },
+  { id: 'mostGpm', label: '단일 경기 최고 GPM', color: '#eab308', unit: 'GPM' },
+];
+
+  const durationToSeconds = (dur) => {
+    const [min, sec] = (dur || '0:00').split(':').map(Number);
+    return (min || 0) * 60 + (sec || 0);
+  };
+
+  const recordData = (() => {
+    const result = {};
+
+    // 경기 기반 기록 (최장/최단)
+    const matchDurations = matches.map(m => ({
+      matchId: m.id,
+      date: m.match_date,
+      duration: m.duration,
+      seconds: durationToSeconds(m.duration),
+      winTeam: m.win_team,
+    }));
+
+    const longest = [...matchDurations].sort((a, b) => b.seconds - a.seconds)[0];
+    const shortest = [...matchDurations].sort((a, b) => a.seconds - b.seconds)[0];
+
+    const getLongestPlayers = (matchId) =>
+      allStats.filter(s => String(s.match_id) === String(matchId)).map(s => s.nickname);
+
+    result.longestGame = longest ? {
+      value: longest.duration,
+      date: longest.date,
+      matchId: longest.matchId,
+      players: getLongestPlayers(longest.matchId),
+      sub: `${longest.winTeam} 승`,
+    } : null;
+
+    result.shortestGame = shortest ? {
+      value: shortest.duration,
+      date: shortest.date,
+      matchId: shortest.matchId,
+      players: getLongestPlayers(shortest.matchId),
+      sub: `${shortest.winTeam} 승`,
+    } : null;
+
+    // 플레이어 기반 기록
+    const playerRecords = allStats.map(s => {
+      const match = matches.find(m => String(m.id) === String(s.match_id));
+      const [min, sec] = (match?.duration || '20:00').split(':').map(Number);
+      const mTotal = (min || 20) + (sec / 60 || 0);
+      const deaths = Number(s.deaths || 0);
+      const ka = Number(s.kills || 0) + Number(s.assists || 0);
+      const kda = deaths === 0 ? (ka > 0 ? 99999 : 0) : ka / deaths;
+      return {
+        nickname: s.nickname,
+        champion: s.champion,
+        matchId: s.match_id,
+        date: match?.match_date || '-',
+        duration: match?.duration || '-',
+        lane: String(s.lane || '').toUpperCase().trim(),
+        kills: Number(s.kills || 0),
+        deaths,
+        assists: Number(s.assists || 0),
+        damage: Number(s.damage || 0),
+        cs: Number(s.cs || 0),
+        gold: Number(s.gold || 0),
+        vision: Number(s.vision_score || 0),
+        dpm: Math.round(Number(s.damage || 0) / mTotal),
+        gpm: Math.round(Number(s.gold || 0) / mTotal),
+        kda,
+        kdaStr: deaths === 0 ? (ka > 0 ? 'Perfect' : '0.00') : kda.toFixed(2),
+        multiKill: s.multi_kill,
+      };
+    });
+
+    const makeRecord = (arr, key, label, unit, formatter) => {
+      const sorted = [...arr].sort((a, b) => b[key] - a[key]);
+      const top = sorted[0];
+      if (!top) return null;
+      return {
+        nickname: top.nickname,
+        champion: top.champion,
+        value: formatter ? formatter(top[key]) : top[key].toLocaleString(),
+        rawValue: top[key],
+        unit,
+        date: top.date,
+        duration: top.duration,
+        lane: top.lane,
+        matchId: top.matchId,
+        kills: top.kills,
+        deaths: top.deaths,
+        assists: top.assists,
+        sub: `${top.kills}/${top.deaths}/${top.assists} · ${top.duration}`,
+      };
+    };
+
+    result.mostKills = makeRecord(playerRecords, 'kills', '최다 킬', '킬');
+    result.mostAssists = makeRecord(playerRecords, 'assists', '최다 어시', '어시');
+    result.mostDamage = makeRecord(playerRecords, 'damage', '최다 딜', '딜', v => v.toLocaleString());
+    result.mostCs = makeRecord(playerRecords, 'cs', '최다 CS', 'CS');
+    result.mostGold = makeRecord(playerRecords, 'gold', '최다 골드', 'Gold', v => v.toLocaleString());
+    result.mostVision = makeRecord(playerRecords, 'vision', '최다 시야', '점');
+    result.mostDpm = makeRecord(playerRecords, 'dpm', '최고 DPM', 'DPM', v => v.toLocaleString());
+    result.mostGpm = makeRecord(playerRecords, 'gpm', '최고 GPM', 'GPM', v => v.toLocaleString());
+
+
+    return result;
+  })();
+
   const normalizeLane = (raw) => { const u = String(raw || '').toUpperCase().trim(); const map = { 'JUNGLE': 'JNG', 'BOT': 'ADC', 'SUPPORT': 'SUP' }; return map[u] || u; };
 
   // 평균 지표 랭킹
@@ -1216,6 +1461,86 @@ function Leaderboard({ allStats, matches, isMobile }) {
     return typeof row[selectedMetric] === 'number' ? row[selectedMetric].toLocaleString() : row[selectedMetric];
   };
 
+  // 경기 기록 카드
+  const RecordCard = ({ category, data }) => {
+    if (!data) return (
+      <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: '1px solid #374151', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ fontSize: '13px', color: '#6b7280', fontWeight: 'bold' }}>{category.label}</div>
+        <div style={{ fontSize: '13px', color: '#4b5563' }}>데이터 없음</div>
+      </div>
+    );
+
+    const isMatchRecord = category.id === 'longestGame' || category.id === 'shortestGame';
+
+    return (
+      <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: `1px solid ${category.color}33`, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {/* 카테고리 라벨 */}
+        <div style={{ fontSize: '12px', color: category.color, fontWeight: 'bold', letterSpacing: '0.5px' }}>
+          {category.label}
+        </div>
+
+        {isMatchRecord ? (
+          // 경기 기반 카드 (최장/최단)
+          <div>
+            <div style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>
+              {data.value}
+            </div>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>{data.date} · {data.sub}</div>
+          </div>
+        ) : (
+  // 플레이어 기반 카드
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', alignItems: 'center', gap: '8px' }}>
+    {/* 왼쪽: 챔피언 이미지 */}
+    <div style={{ display: 'flex', justifyContent: 'center', paddingRight: '80px' }}>
+      <img
+        src={getChampImgUrl(data.champion)}
+        alt=""
+        style={{ width: '44px', height: '44px', borderRadius: '10px', border: `2px solid ${category.color}`, flexShrink: 0 }}
+      />
+    </div>
+
+    {/* 가운데: 닉네임 */}
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff' }}>{data.nickname}</div>
+      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+        {getChampKoName(data.champion)} · {data.lane}
+      </div>
+      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{data.sub}</div>
+    </div>
+
+    {/* 오른쪽: 수치 */}
+    <div style={{ textAlign: 'right' }}>
+      <div style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '900', color: category.color, lineHeight: 1 }}>
+        {data.value}
+      </div>
+      {data.unit && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{data.unit}</div>}
+    </div>
+  </div>
+)}
+
+        {/* 날짜 */}
+        <div style={{ fontSize: '11px', color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: '8px' }}>
+          📅 {data.date} · ⏱️ {data.duration || data.value}
+        </div>
+
+        {/* 펜타킬 전체 목록 */}
+        {category.id === 'mostPenta' && data.allPenta && data.allPenta.length > 1 && (
+          <div style={{ borderTop: '1px solid #1f2937', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>전체 펜타킬 기록 ({data.allPenta.length}회)</div>
+            {data.allPenta.map((p, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
+                <img src={getChampImgUrl(p.champion)} alt="" style={{ width: '22px', height: '22px', borderRadius: '4px', border: '1px solid #374151' }} />
+                <span style={{ color: '#fff', fontWeight: 'bold' }}>{p.nickname}</span>
+                <span style={{ color: '#9ca3af' }}>{getChampKoName(p.champion)}</span>
+                <span style={{ color: '#6b7280', marginLeft: 'auto' }}>{p.date}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* 모드 전환 버튼 */}
@@ -1226,12 +1551,14 @@ function Leaderboard({ allStats, matches, isMobile }) {
         <button onClick={() => setMode('total')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'total' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'total' ? '#431407' : '#111827', color: mode === 'total' ? '#f97316' : '#9ca3af', transition: '0.2s' }}>
           🎖️ 누적 기록
         </button>
+        <button onClick={() => setMode('record')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'record' ? '1px solid #a855f7' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'record' ? '#2e1065' : '#111827', color: mode === 'record' ? '#a855f7' : '#9ca3af', transition: '0.2s' }}>
+          🏅 경기 기록
+        </button>
       </div>
 
       {/* 평균 지표 모드 */}
       {mode === 'avg' && (
         <>
-          {/* 통합/라인별 토글 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
             <button onClick={() => setAvgScope('total')} style={{ padding: '6px 16px', borderRadius: '8px', border: avgScope === 'total' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: avgScope === 'total' ? '#1e3a5f' : '#111827', color: avgScope === 'total' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>통합</button>
             <button onClick={() => setAvgScope('lane')} style={{ padding: '6px 16px', borderRadius: '8px', border: avgScope === 'lane' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: avgScope === 'lane' ? '#1e3a5f' : '#111827', color: avgScope === 'lane' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>라인별</button>
@@ -1243,8 +1570,6 @@ function Leaderboard({ allStats, matches, isMobile }) {
               </div>
             )}
           </div>
-
-          {/* 지표 버튼 */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
             {metrics.map(m => (
               <button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827', color: selectedMetric === m.id ? m.color : '#9ca3af' }}>
@@ -1252,7 +1577,6 @@ function Leaderboard({ allStats, matches, isMobile }) {
               </button>
             ))}
           </div>
-
           {sortedAvg.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>5경기 이상 데이터가 없습니다</p></div>
           ) : (
@@ -1298,7 +1622,6 @@ function Leaderboard({ allStats, matches, isMobile }) {
               </div>
             )}
           </div>
-
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
             {totalMetrics.map(m => (
               <button key={m.id} onClick={() => setSelectedTotal(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedTotal === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedTotal === m.id ? `${m.color}22` : '#111827', color: selectedTotal === m.id ? m.color : '#9ca3af' }}>
@@ -1306,7 +1629,6 @@ function Leaderboard({ allStats, matches, isMobile }) {
               </button>
             ))}
           </div>
-
           {sortedTotal.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>데이터가 없습니다</p></div>
           ) : (
@@ -1344,6 +1666,15 @@ function Leaderboard({ allStats, matches, isMobile }) {
             </div>
           )}
         </>
+      )}
+
+      {/* 경기 기록 모드 */}
+      {mode === 'record' && (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '16px' }}>
+          {recordCategories.map(category => (
+            <RecordCard key={category.id} category={category} data={recordData[category.id]} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1687,11 +2018,23 @@ function App() {
 
         {/* ===== 챔피언 분석 ===== */}
         {mainTab === 'champion' && (
-          <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
-            <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>⚔️ 챔피언 분석</h2>
-            <ChampionAnalysis allStats={allStats} matches={matches} isMobile={isMobile} />
-          </section>
-        )}
+  <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
+    <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>⚔️ 챔피언 분석</h2>
+    <ChampionAnalysis
+      allStats={allStats}
+      matches={matches}
+      isMobile={isMobile}
+      onNavigateToMatch={(matchId) => {
+        setSelectedMatchId(matchId);
+        fetchMatchStats(matchId);
+        setMainTab('search');
+        const targetDate = matches.find(m => String(m.id) === String(matchId))?.match_date;
+        if (targetDate) setOpenDates(prev => ({ ...prev, [targetDate]: true }));
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+      }}
+    />
+  </section>
+)}
 
         {/* ===== 개인 지표 ===== */}
         {mainTab === 'player' && (
