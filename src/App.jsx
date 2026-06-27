@@ -28,7 +28,7 @@ const laneOrder = {
 const getChampImgUrl = (enId) => {
   if (!enId) return 'https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/tiles/Empty_0.jpg';
   const formattedId = enId.charAt(0).toUpperCase() + enId.slice(1);
-  return `https://ddragon.leagueoflegends.com/cdn/img/champion/tiles/${formattedId}_0.jpg`;
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/tiles/${enId}_0.jpg`;;
 };
 
 const ALL_CHAMPIONS = [
