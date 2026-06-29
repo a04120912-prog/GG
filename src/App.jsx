@@ -21,6 +21,8 @@ const useIsMobile = () => {
   return isMobile;
 };
 
+const SEASON2_START = '2026-07-01';
+
 const laneOrder = {
   'TOP': 1, 'JNG': 2, 'JUNGLE': 2, 'MID': 3, 'ADC': 4, 'BOT': 4, 'SUP': 5, 'SUPPORT': 5
 };
@@ -28,7 +30,7 @@ const laneOrder = {
 const getChampImgUrl = (enId) => {
   if (!enId) return 'https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/tiles/Empty_0.jpg';
   const formattedId = enId.charAt(0).toUpperCase() + enId.slice(1);
-  return `https://ddragon.leagueoflegends.com/cdn/img/champion/tiles/${enId}_0.jpg`;;
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/tiles/${formattedId}_0.jpg`;
 };
 
 const ALL_CHAMPIONS = [
@@ -45,14 +47,10 @@ const getChampKoName = (enName) => {
 const getSignatureOrMostChamp = (nickname, allStats, matches) => {
   const history = allStats.filter(s => s.nickname === nickname);
   const totalGames = history.length || 1;
-
-  // 픽 횟수
   const counts = {};
   history.forEach(s => {
     if (s.champion) counts[s.champion] = (counts[s.champion] || 0) + 1;
   });
-
-  // 밴 횟수
   const banCounts = {};
   history.forEach(s => {
     const match = matches.find(m => String(m.id) === String(s.match_id));
@@ -66,16 +64,11 @@ const getSignatureOrMostChamp = (nickname, allStats, matches) => {
       banCounts[b.champ] = (banCounts[b.champ] || 0) + 1;
     });
   });
-
-  // 시그니처 챔피언 찾기
   const signature = Object.entries(counts).find(([name]) => {
     const banRate = Math.round(((banCounts[name] || 0) + (counts[name] || 0)) / totalGames * 100);
     return banRate > 50 && totalGames >= 5;
   });
-
   if (signature) return signature[0];
-
-  // 없으면 모스트 챔피언
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
 };
 
@@ -243,71 +236,45 @@ function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   };
 
- const ChampMatchPanel = ({ champName }) => {
-  const champMatches = getChampMatches(champName);
-  return (
-    <div style={{ backgroundColor: '#111827', borderTop: '1px solid #3b82f6', padding: '16px 24px 20px' }}>
-      <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '12px' }}>🗂️ 경기 목록</h4>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
-        {champMatches.map((g, i) => (
-          <div
-            key={i}
-            onClick={() => onNavigateToMatch(g.matchId)}
-            onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = '#374151'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              backgroundColor: '#0d1117',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              border: '1px solid #374151',
-              cursor: 'pointer',
-              transition: '0.15s',
-            }}
-          >
-            <img
-              src={getChampImgUrl(g.champion || champName)}
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '7px',
-                border: `2px solid ${g.isWin ? '#3b82f6' : '#374151'}`,
-                flexShrink: 0,
-              }}
-              alt=""
-            />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', color: g.isWin ? '#60a5fa' : '#6b7280', fontWeight: 'bold', marginBottom: '2px' }}>
-                {g.isWin ? '✓ 승리' : '✗ 패배'}
+  const ChampMatchPanel = ({ champName }) => {
+    const champMatches = getChampMatches(champName);
+    return (
+      <div style={{ backgroundColor: '#111827', borderTop: '1px solid #3b82f6', padding: '16px 24px 20px' }}>
+        <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '12px' }}>🗂️ 경기 목록</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+          {champMatches.map((g, i) => (
+            <div
+              key={i}
+              onClick={() => onNavigateToMatch(g.matchId)}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = '#374151'}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#0d1117', borderRadius: '10px', padding: '12px 16px', border: '1px solid #374151', cursor: 'pointer', transition: '0.15s' }}
+            >
+              <img src={getChampImgUrl(g.champion || champName)} style={{ width: '34px', height: '34px', borderRadius: '7px', border: `2px solid ${g.isWin ? '#3b82f6' : '#374151'}`, flexShrink: 0 }} alt="" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '11px', color: g.isWin ? '#60a5fa' : '#6b7280', fontWeight: 'bold', marginBottom: '2px' }}>{g.isWin ? '✓ 승리' : '✗ 패배'}</div>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.nickname} · {g.lane}</div>
+                <div style={{ fontSize: '12px', color: '#d1d5db' }}>{g.kills}/{g.deaths}/{g.assists}</div>
               </div>
-              <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {g.nickname} · {g.lane}
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '2px' }}>{g.date}</div>
+                <div style={{ fontSize: '11px', color: '#6b7280' }}>{g.duration}</div>
               </div>
-              <div style={{ fontSize: '12px', color: '#d1d5db' }}>
-                {g.kills}/{g.deaths}/{g.assists}
-              </div>
+              {!isMobile && (
+                <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '90px' }}>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>CS {g.cs}</div>
+                  <div style={{ fontSize: '12px', color: '#fca5a5', fontWeight: 'bold' }}>{g.dpm.toLocaleString()} DPM</div>
+                </div>
+              )}
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '2px' }}>{g.date}</div>
-              <div style={{ fontSize: '11px', color: '#6b7280' }}>{g.duration}</div>
-            </div>
-            {!isMobile && (
-              <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '90px' }}>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>CS {g.cs}</div>
-                <div style={{ fontSize: '12px', color: '#fca5a5', fontWeight: 'bold' }}>{g.dpm.toLocaleString()} DPM</div>
-              </div>
-            )}
-          </div>
-        ))}
-        {champMatches.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '30px', color: '#4b5563' }}>경기 데이터가 없습니다</div>
-        )}
+          ))}
+          {champMatches.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#4b5563' }}>경기 데이터가 없습니다</div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const sorted = [...champStats].sort((a, b) => {
     const aVal = sortKey === 'kda' ? a.kdaNum : (parseFloat(a[sortKey]) || 0);
@@ -328,7 +295,6 @@ function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
 
   const lanes = ['ALL', 'TOP', 'JNG', 'MID', 'ADC', 'SUP'];
 
-  // 모바일: 카드형 레이아웃
   if (isMobile) {
     return (
       <div>
@@ -350,10 +316,7 @@ function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
             const isExpanded = expandedChamp === c.name;
             return (
               <div key={c.name} style={{ borderRadius: '12px', border: isExpanded ? '1px solid #3b82f6' : '1px solid #374151', overflow: 'hidden' }}>
-                <div
-                  onClick={() => setExpandedChamp(isExpanded ? null : c.name)}
-                  style={{ backgroundColor: isExpanded ? 'rgba(59,130,246,0.1)' : i % 2 === 0 ? '#1a2030' : '#1f2937', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
-                >
+                <div onClick={() => setExpandedChamp(isExpanded ? null : c.name)} style={{ backgroundColor: isExpanded ? 'rgba(59,130,246,0.1)' : i % 2 === 0 ? '#1a2030' : '#1f2937', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                   <img src={getChampImgUrl(c.name)} alt={c.name} style={{ width: '40px', height: '40px', borderRadius: '8px', border: `2px solid ${winColor}`, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{getChampKoName(c.name)}</div>
@@ -379,7 +342,6 @@ function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
     );
   }
 
-  // PC: 테이블
   return (
     <div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
@@ -421,16 +383,7 @@ function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
                     onMouseEnter={() => setHoveredChamp(c.name)}
                     onMouseLeave={() => setHoveredChamp(null)}
                     onClick={() => setExpandedChamp(isExpanded ? null : c.name)}
-                    style={{
-                      borderBottom: isExpanded ? 'none' : '1px solid #1f2937',
-                      backgroundColor: isExpanded
-                        ? 'rgba(59,130,246,0.12)'
-                        : isHovered
-                        ? 'rgba(59,130,246,0.07)'
-                        : i % 2 === 0 ? '#1a2030' : '#1f2937',
-                      transition: '0.15s',
-                      cursor: 'pointer',
-                    }}
+                    style={{ borderBottom: isExpanded ? 'none' : '1px solid #1f2937', backgroundColor: isExpanded ? 'rgba(59,130,246,0.12)' : isHovered ? 'rgba(59,130,246,0.07)' : i % 2 === 0 ? '#1a2030' : '#1f2937', transition: '0.15s', cursor: 'pointer' }}
                   >
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -440,7 +393,7 @@ function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
                         </div>
                         <div>
                           <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '13px' }}>{getChampKoName(c.name)}</div>
-                          <div style={{ fontSize: '10px', color: '#6b7280' }}>{c.pickCount}경기 </div>
+                          <div style={{ fontSize: '10px', color: '#6b7280' }}>{c.pickCount}경기</div>
                         </div>
                       </div>
                     </td>
@@ -503,7 +456,6 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
 
   return (
     <div>
-      {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
           <h2 style={{ fontSize: isMobile ? '16px' : '22px', fontWeight: 'bold', color: '#60a5fa', margin: 0 }}>👤 {selectedPlayer.nickname} 분석 리포트</h2>
@@ -515,7 +467,6 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
         <button onClick={() => setSelectedPlayer(null)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '20px' }}>✕</button>
       </div>
 
-      {/* 라인 탭 */}
       <div style={{ display: 'flex', gap: isMobile ? '6px' : '10px', marginBottom: '25px', flexWrap: 'wrap' }}>
         <LineTab label="전체" active={selectedLine === 'ALL'} count={selectedPlayer.fullHistory.length} winRate={Math.round((selectedPlayer.fullHistory.filter(h => h.isWin).length / selectedPlayer.fullHistory.length) * 100)} onClick={() => { setSelectedLine('ALL'); setSelectedChampion(null); }} isMobile={isMobile} />
         {['TOP', 'JNG', 'MID', 'ADC', 'SUP'].map(lane => {
@@ -525,7 +476,6 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
         })}
       </div>
 
-      {/* 스탯 카드 */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '25px' }}>
         <StatItem label="승률" value={`${currentData.winRate}%`} color="#3b82f6" />
         <StatItem label="KDA" value={currentData.kda} color="#10b981" rank={getRankingsByLine(selectedPlayer.nickname, 'avgKda', selectedLine, currentData)} />
@@ -541,15 +491,12 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
         <StatItem label="제어 와드" value={`${currentData.avgControlWards}개`} color="#60a5fa" rank={getRankingsByLine(selectedPlayer.nickname, 'avgControlWards', selectedLine, currentData)} />
       </div>
 
-      {/* 모스트 픽 & 밴 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
           <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🔝 MOST PICKED</h3>
           <div style={{ display: 'flex', justifyContent: 'space-around' }}>
             {(() => {
-              const fullHistory = selectedLine === 'ALL'
-                ? (selectedPlayer?.fullHistory || [])
-                : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
+              const fullHistory = selectedLine === 'ALL' ? (selectedPlayer?.fullHistory || []) : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
               const totalGames = fullHistory.length || 1;
               const history = (currentData?.history && currentData.history.length > 0) ? currentData.history : fullHistory;
               const matchesArr = matches || [];
@@ -595,9 +542,7 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
           <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🚫 MOST BANNED</h3>
           <div style={{ display: 'flex', justifyContent: 'space-around' }}>
             {(() => {
-              const fullHistory = selectedLine === 'ALL'
-                ? (selectedPlayer?.fullHistory || [])
-                : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
+              const fullHistory = selectedLine === 'ALL' ? (selectedPlayer?.fullHistory || []) : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
               const totalGames = fullHistory.length || 1;
               const matchesArr = matches || [];
               const counts = {};
@@ -639,70 +584,54 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
         </div>
       </div>
 
-      {/* 함께할 때 좋은 팀원 */}
-<div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151', marginBottom: '25px' }}>
-  <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🤝 BEST TEAMMATES</h3>
-  <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-    {(() => {
-      const fullHistory = selectedLine === 'ALL'
-        ? (selectedPlayer?.fullHistory || [])
-        : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
-      const matchesArr = matches || [];
-      const teammateMap = {};
+      <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151', marginBottom: '25px' }}>
+        <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🤝 BEST TEAMMATES</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+          {(() => {
+            const fullHistory = selectedLine === 'ALL' ? (selectedPlayer?.fullHistory || []) : (selectedPlayer?.fullHistory || []).filter(h => h.lane === selectedLine);
+            const matchesArr = matches || [];
+            const teammateMap = {};
+            fullHistory.forEach(h => {
+              const mId = h.match_id || h.matchId || h.id;
+              const match = matchesArr.find(m => String(m.id) === String(mId));
+              if (!match) return;
+              const mySide = (h.side || (h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue'))).toLowerCase();
+              const teammates = allStats.filter(s => String(s.match_id) === String(mId) && s.nickname !== selectedPlayer.nickname && String(s.side || '').toLowerCase() === mySide);
+              teammates.forEach(t => {
+                if (!teammateMap[t.nickname]) teammateMap[t.nickname] = { wins: 0, losses: 0 };
+                if (h.isWin) teammateMap[t.nickname].wins++;
+                else teammateMap[t.nickname].losses++;
+              });
+            });
+            const sorted = Object.entries(teammateMap).map(([nickname, { wins, losses }]) => {
+              const mostChamp = getSignatureOrMostChamp(nickname, allStats, matches);
+              return { nickname, wins, losses, total: wins + losses, winRate: Math.round((wins / (wins + losses)) * 100), mostChamp };
+            }).filter(t => t.total >= 4).sort((a, b) => b.winRate - a.winRate || b.total - a.total).slice(0, 3);
+            if (sorted.length === 0) return <p style={{ color: '#4b5563', fontSize: '12px', textAlign: 'center', width: '100%' }}>데이터 없음</p>;
+            return sorted.map((t, i) => {
+              const winColor = t.winRate >= 60 ? '#34d399' : t.winRate >= 50 ? '#60a5fa' : '#f87171';
+              const medals = ['🥇', '🥈', '🥉'];
+              return (
+                <div key={t.nickname} style={{ textAlign: 'center' }}>
+                  <div style={{ position: 'relative', display: 'inline-block', marginBottom: '4px' }}>
+                    <img src={getChampImgUrl(t.mostChamp)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: `2px solid ${winColor}`, boxShadow: `0 0 10px ${winColor}44` }} alt={t.mostChamp} />
+                    <div style={{ position: 'absolute', top: '-8px', left: '-8px', fontSize: '18px' }}>{medals[i]}</div>
+                  </div>
+                  <p style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', marginBottom: '2px' }}>{t.nickname}</p>
+                  <p style={{ fontSize: '13px', fontWeight: 'bold', color: winColor, marginBottom: '2px' }}>{t.winRate}%</p>
+                  <p style={{ fontSize: '10px', color: '#6b7280' }}>
+                    <span style={{ color: '#60a5fa' }}>{t.wins}승</span>
+                    <span style={{ color: '#4b5563', margin: '0 3px' }}>/</span>
+                    <span style={{ color: '#f87171' }}>{t.losses}패</span>
+                    <span style={{ color: '#4b5563', marginLeft: '3px' }}>({t.total}경기)</span>
+                  </p>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </div>
 
-      fullHistory.forEach(h => {
-        const mId = h.match_id || h.matchId || h.id;
-        const match = matchesArr.find(m => String(m.id) === String(mId));
-        if (!match) return;
-        const mySide = (h.side || (h.isWin ? match.win_team : (match.win_team === 'Blue' ? 'Red' : 'Blue'))).toLowerCase();
-        const teammates = allStats.filter(s =>
-          String(s.match_id) === String(mId) &&
-          s.nickname !== selectedPlayer.nickname &&
-          String(s.side || '').toLowerCase() === mySide
-        );
-        teammates.forEach(t => {
-          if (!teammateMap[t.nickname]) teammateMap[t.nickname] = { wins: 0, losses: 0 };
-          if (h.isWin) teammateMap[t.nickname].wins++;
-          else teammateMap[t.nickname].losses++;
-        });
-      });
-
-      const sorted = Object.entries(teammateMap)
-        .map(([nickname, { wins, losses }]) => {
-          const mostChamp = getSignatureOrMostChamp(nickname, allStats, matches);
-          return { nickname, wins, losses, total: wins + losses, winRate: Math.round((wins / (wins + losses)) * 100), mostChamp };
-        })
-        .filter(t => t.total >= 4)
-        .sort((a, b) => b.winRate - a.winRate || b.total - a.total)
-        .slice(0, 3);
-
-      if (sorted.length === 0) return <p style={{ color: '#4b5563', fontSize: '12px', textAlign: 'center', width: '100%' }}>데이터 없음</p>;
-
-      return sorted.map((t, i) => {
-        const winColor = t.winRate >= 60 ? '#34d399' : t.winRate >= 50 ? '#60a5fa' : '#f87171';
-        const medals = ['🥇', '🥈', '🥉'];
-        return (
-          <div key={t.nickname} style={{ textAlign: 'center' }}>
-            <div style={{ position: 'relative', display: 'inline-block', marginBottom: '4px' }}>
-              <img src={getChampImgUrl(t.mostChamp)} style={{ width: '45px', height: '45px', borderRadius: '10px', border: `2px solid ${winColor}`, boxShadow: `0 0 10px ${winColor}44` }} alt={t.mostChamp} />
-              <div style={{ position: 'absolute', top: '-8px', left: '-8px', fontSize: '18px' }}>{medals[i]}</div>
-            </div>
-            <p style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', marginBottom: '2px' }}>{t.nickname}</p>
-            <p style={{ fontSize: '13px', fontWeight: 'bold', color: winColor, marginBottom: '2px' }}>{t.winRate}%</p>
-            <p style={{ fontSize: '10px', color: '#6b7280' }}>
-              <span style={{ color: '#60a5fa' }}>{t.wins}승</span>
-              <span style={{ color: '#4b5563', margin: '0 3px' }}>/</span>
-              <span style={{ color: '#f87171' }}>{t.losses}패</span>
-              <span style={{ color: '#4b5563', marginLeft: '3px' }}>({t.total}경기)</span>
-            </p>
-          </div>
-        );
-      });
-    })()}
-  </div>
-</div>
-
-      {/* 추이 그래프 & 레이더 */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (selectedLine === 'ALL' ? '1fr' : '1.2fr 0.8fr'), gap: '20px' }}>
         <div style={{ backgroundColor: '#111827', padding: isMobile ? '16px' : '25px', borderRadius: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
@@ -779,7 +708,7 @@ function HeadToHead({ allStats, matches, onNavigateToPlayer, onNavigateToMatch, 
         rivalMap[opName].byLane[myLane].push({
           matchId, mySide, date: match.match_date, duration: match.duration, lane: myLane, myIsWin,
           my: { champion: s.champion, kills: Number(s.kills || 0), deaths: Number(s.deaths || 0), assists: Number(s.assists || 0), damage: Number(s.damage || 0), gold: Number(s.gold || 0), cs: Number(s.cs || 0), vision_score: Number(s.vision_score || 0), dpm: Math.round(Number(s.damage || 0) / mTotal), gpm: Math.round(Number(s.gold || 0) / mTotal) },
-op: { champion: op.champion, kills: Number(op.kills || 0), deaths: Number(op.deaths || 0), assists: Number(op.assists || 0), damage: Number(op.damage || 0), gold: Number(op.gold || 0), cs: Number(op.cs || 0), vision_score: Number(op.vision_score || 0), dpm: Math.round(Number(op.damage || 0) / mTotal), gpm: Math.round(Number(op.gold || 0) / mTotal) },
+          op: { champion: op.champion, kills: Number(op.kills || 0), deaths: Number(op.deaths || 0), assists: Number(op.assists || 0), damage: Number(op.damage || 0), gold: Number(op.gold || 0), cs: Number(op.cs || 0), vision_score: Number(op.vision_score || 0), dpm: Math.round(Number(op.damage || 0) / mTotal), gpm: Math.round(Number(op.gold || 0) / mTotal) },
         });
       });
     });
@@ -852,7 +781,6 @@ op: { champion: op.champion, kills: Number(op.kills || 0), deaths: Number(op.dea
             <button onClick={() => setSelectedLaneTab(prev => ({ ...prev, [r.nickname]: 'ALL' }))} style={{ padding: '6px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: activeLane === 'ALL' ? '#6b21a8' : '#1f2937', color: activeLane === 'ALL' ? '#fff' : '#9ca3af', border: activeLane === 'ALL' ? '1px solid #a855f7' : '1px solid #374151' }}>전체 ({r.overall.total})</button>
           </div>
         )}
-        {/* 요약 카드 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', backgroundColor: '#1f2937', borderRadius: '16px', overflow: 'hidden', border: '1px solid #374151', marginBottom: '20px' }}>
           <div style={{ padding: isMobile ? '14px' : '24px', textAlign: 'center', background: 'linear-gradient(135deg,rgba(59,130,246,0.15) 0%,transparent 100%)' }}>
             <div style={{ fontSize: isMobile ? '13px' : '18px', fontWeight: '900', color: '#60a5fa', marginBottom: '16px' }}>{playerA}</div>
@@ -885,7 +813,6 @@ op: { champion: op.champion, kills: Number(op.kills || 0), deaths: Number(op.dea
             </div>
           </div>
         </div>
-        {/* 지표 비교 */}
         <div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '20px 24px', border: '1px solid #374151', marginBottom: '20px' }}>
           <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '18px' }}>
             📊 지표 비교
@@ -906,231 +833,107 @@ op: { champion: op.champion, kills: Number(op.kills || 0), deaths: Number(op.dea
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '6px', borderRadius: '3px', backgroundColor: '#ef4444' }} /><span style={{ fontSize: '12px', color: '#6b7280' }}>{r.nickname}</span></div>
           </div>
         </div>
-        {/* 6각형 레이더 차트 */}
-<div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '5px 24px', border: '1px solid #374151', marginBottom: '20px' }}>
-  <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>🕸️ 육각형 레이더 비교</h4>
-  {(() => {
-  const opNickname = r.nickname;
-  const keys = [
-    { key: 'dpm', label: 'DPM' },
-    { key: 'gpm', label: 'GPM' },
-    { key: 'kda', label: 'KDA' },
-    { key: 'cs', label: 'CS' },
-    { key: 'vs', label: '시야' },
-    { key: 'kp', label: 'KP' },
-  ];
-
- const myRaw = {
-  dpm: st.myAvgDpm,
-  gpm: st.myAvgGpm,
-  kda: st.myKdaNum,
-  cs: parseFloat(st.myAvgCs),
-  vs: st.games ? (st.games.reduce((s, g) => s + (g.my.vision_score || 0), 0) / st.games.length) : 0,
-  kp: st.games ? (st.games.reduce((s, g) => {
-    const myTeamKills = allStats
-      .filter(stat => String(stat.match_id) === String(g.matchId) && String(stat.side || '').trim() === String(g.mySide || '').trim())
-      .reduce((sum, stat) => sum + Number(stat.kills || 0), 0);
-    return s + (myTeamKills > 0 ? (g.my.kills + g.my.assists) / myTeamKills : 0);
-  }, 0) / st.games.length * 100) : 0,
-};
-
-const opRaw = {
-  dpm: st.opAvgDpm,
-  gpm: st.opAvgGpm,
-  kda: st.opKdaNum,
-  cs: parseFloat(st.opAvgCs),
-  vs: st.games ? (st.games.reduce((s, g) => s + (g.op.vision_score || 0), 0) / st.games.length) : 0,
-  kp: st.games ? (st.games.reduce((s, g) => {
-    const opTeamKills = allStats
-      .filter(stat => String(stat.match_id) === String(g.matchId) && String(stat.side || '').trim() !== String(g.mySide || '').trim())
-      .reduce((sum, stat) => sum + Number(stat.kills || 0), 0);
-    return s + (opTeamKills > 0 ? (g.op.kills + g.op.assists) / opTeamKills : 0);
-  }, 0) / st.games.length * 100) : 0,
-};
-  const normalize = (myVal, opVal) => {
-    const max = Math.max(myVal, opVal, 0.001);
-    return [Math.min((myVal / max) * 85, 100), Math.min((opVal / max) * 85, 100)];
-  };
-
-  const cx = 140, cy = 130, rad = 100;
-  const angleStep = (Math.PI * 2) / 6;
-  const getPoint = (angle, radius) => ({
-    x: cx + radius * Math.sin(angle),
-    y: cy - radius * Math.cos(angle),
-  });
-
-  const myPoints = keys.map((k, i) => {
-    const [myN] = normalize(myRaw[k.key], opRaw[k.key]);
-    return getPoint(angleStep * i, (myN / 100) * rad);
-  });
-  const opPoints = keys.map((k, i) => {
-    const [, opN] = normalize(myRaw[k.key], opRaw[k.key]);
-    return getPoint(angleStep * i, (opN / 100) * rad);
-  });
-  const gridPoints = (ratio) => keys.map((_, i) => getPoint(angleStep * i, rad * ratio));
-  const toPath = (points) => points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + 'Z';
-
-  // ★ 추가: hover 상태
-  const [hoveredIdx, setHoveredIdx] = useState(null);
-
-  const formatRawVal = (key, val) => {
-    if (key === 'kda') return val >= 9999 ? 'Perfect' : val.toFixed(2);
-    if (key === 'kp') return val.toFixed(1) + '%';
-    if (key === 'cs') return val.toFixed(1);
-    if (key === 'dpm' || key === 'gpm') return Math.round(val).toLocaleString();
-    return val.toFixed(1);
-  };
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
-      <div style={{ position: 'relative' }}>
-        <svg width="280" height="260" style={{ overflow: 'visible' }}>
-          {/* 격자 */}
-          {[0.25, 0.5, 0.75, 1].map((ratio, ri) => (
-            <polygon key={ri} points={gridPoints(ratio).map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#374151" strokeWidth="1" />
-          ))}
-          {/* 축선 */}
-          {keys.map((_, i) => {
-            const outer = getPoint(angleStep * i, rad);
-            return <line key={i} x1={cx} y1={cy} x2={outer.x} y2={outer.y} stroke="#374151" strokeWidth="1" />;
-          })}
-          {/* 상대 영역 */}
-          <path d={toPath(opPoints)} fill="rgba(239,68,68,0.15)" stroke="#ef4444" strokeWidth="2" />
-          {/* 내 영역 */}
-          <path d={toPath(myPoints)} fill="rgba(59,130,246,0.2)" stroke="#3b82f6" strokeWidth="2" />
-          {/* 라벨 */}
-          {keys.map((k, i) => {
-            const labelPt = getPoint(angleStep * i, rad + 18);
-            const isHovered = hoveredIdx === i;
+        <div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '5px 24px', border: '1px solid #374151', marginBottom: '20px' }}>
+          <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>🕸️ 육각형 레이더 비교</h4>
+          {(() => {
+            const opNickname = r.nickname;
+            const keys = [
+              { key: 'dpm', label: 'DPM' }, { key: 'gpm', label: 'GPM' }, { key: 'kda', label: 'KDA' },
+              { key: 'cs', label: 'CS' }, { key: 'vs', label: '시야' }, { key: 'kp', label: 'KP' },
+            ];
+            const myRaw = {
+              dpm: st.myAvgDpm, gpm: st.myAvgGpm, kda: st.myKdaNum, cs: parseFloat(st.myAvgCs),
+              vs: st.games ? (st.games.reduce((s, g) => s + (g.my.vision_score || 0), 0) / st.games.length) : 0,
+              kp: st.games ? (st.games.reduce((s, g) => {
+                const myTeamKills = allStats.filter(stat => String(stat.match_id) === String(g.matchId) && String(stat.side || '').trim() === String(g.mySide || '').trim()).reduce((sum, stat) => sum + Number(stat.kills || 0), 0);
+                return s + (myTeamKills > 0 ? (g.my.kills + g.my.assists) / myTeamKills : 0);
+              }, 0) / st.games.length * 100) : 0,
+            };
+            const opRaw = {
+              dpm: st.opAvgDpm, gpm: st.opAvgGpm, kda: st.opKdaNum, cs: parseFloat(st.opAvgCs),
+              vs: st.games ? (st.games.reduce((s, g) => s + (g.op.vision_score || 0), 0) / st.games.length) : 0,
+              kp: st.games ? (st.games.reduce((s, g) => {
+                const opTeamKills = allStats.filter(stat => String(stat.match_id) === String(g.matchId) && String(stat.side || '').trim() !== String(g.mySide || '').trim()).reduce((sum, stat) => sum + Number(stat.kills || 0), 0);
+                return s + (opTeamKills > 0 ? (g.op.kills + g.op.assists) / opTeamKills : 0);
+              }, 0) / st.games.length * 100) : 0,
+            };
+            const normalize = (myVal, opVal) => {
+              const max = Math.max(myVal, opVal, 0.001);
+              return [Math.min((myVal / max) * 85, 100), Math.min((opVal / max) * 85, 100)];
+            };
+            const cx = 140, cy = 130, rad = 100;
+            const angleStep = (Math.PI * 2) / 6;
+            const getPoint = (angle, radius) => ({ x: cx + radius * Math.sin(angle), y: cy - radius * Math.cos(angle) });
+            const myPoints = keys.map((k, i) => { const [myN] = normalize(myRaw[k.key], opRaw[k.key]); return getPoint(angleStep * i, (myN / 100) * rad); });
+            const opPoints = keys.map((k, i) => { const [, opN] = normalize(myRaw[k.key], opRaw[k.key]); return getPoint(angleStep * i, (opN / 100) * rad); });
+            const gridPoints = (ratio) => keys.map((_, i) => getPoint(angleStep * i, rad * ratio));
+            const toPath = (points) => points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + 'Z';
+            const [hoveredIdx, setHoveredIdx] = useState(null);
+            const formatRawVal = (key, val) => {
+              if (key === 'kda') return val >= 9999 ? 'Perfect' : val.toFixed(2);
+              if (key === 'kp') return val.toFixed(1) + '%';
+              if (key === 'cs') return val.toFixed(1);
+              if (key === 'dpm' || key === 'gpm') return Math.round(val).toLocaleString();
+              return val.toFixed(1);
+            };
             return (
-              <text key={i} x={labelPt.x} y={labelPt.y} textAnchor="middle" dominantBaseline="middle"
-                fill={isHovered ? '#fff' : '#9ca3af'} fontSize={isHovered ? '12' : '11'} fontWeight={isHovered ? 'bold' : 'normal'}>
-                {k.label}
-              </text>
-            );
-          })}
-          {/* ★ hover 감지용 투명 원 (꼭짓점마다) */}
-          {keys.map((k, i) => {
-            const outerPt = getPoint(angleStep * i, rad + 18);
-            return (
-              <circle
-                key={`hover-${i}`}
-                cx={outerPt.x}
-                cy={outerPt.y}
-                r={18}
-                fill="transparent"
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={() => setHoveredIdx(i)}
-                onMouseLeave={() => setHoveredIdx(null)}
-              />
-            );
-          })}
-        </svg>
-
-        {/* ★ 툴팁 */}
-        {hoveredIdx !== null && (() => {
-          const k = keys[hoveredIdx];
-          const myVal = myRaw[k.key];
-          const opVal = opRaw[k.key];
-          const isBetter = myVal >= opVal;
-          const diff = opVal !== 0 ? ((myVal - opVal) / opVal * 100) : 0;
-          const labelPt = getPoint(angleStep * hoveredIdx, rad + 18);
-          // SVG 좌표 → div 위치로 변환 (SVG가 280×260)
-          const tipX = labelPt.x;
-          const tipY = labelPt.y;
-          const leftAlign = tipX < 140;
-          return (
-            <div style={{
-              position: 'absolute',
-              left: tipX + (leftAlign ? -160 : 20),
-              top: tipY - 50,
-              backgroundColor: 'rgba(17,24,39,0.97)',
-              border: '1px solid #3b82f6',
-              borderRadius: '10px',
-              padding: '10px 14px',
-              pointerEvents: 'none',
-              zIndex: 50,
-              minWidth: '150px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-            }}>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#60a5fa', marginBottom: '8px' }}>{k.label}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                  <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{playerA}</span>
-                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{formatRawVal(k.key, myVal)}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative' }}>
+                  <svg width="280" height="260" style={{ overflow: 'visible' }}>
+                    {[0.25, 0.5, 0.75, 1].map((ratio, ri) => (<polygon key={ri} points={gridPoints(ratio).map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#374151" strokeWidth="1" />))}
+                    {keys.map((_, i) => { const outer = getPoint(angleStep * i, rad); return <line key={i} x1={cx} y1={cy} x2={outer.x} y2={outer.y} stroke="#374151" strokeWidth="1" />; })}
+                    <path d={toPath(opPoints)} fill="rgba(239,68,68,0.15)" stroke="#ef4444" strokeWidth="2" />
+                    <path d={toPath(myPoints)} fill="rgba(59,130,246,0.2)" stroke="#3b82f6" strokeWidth="2" />
+                    {keys.map((k, i) => { const labelPt = getPoint(angleStep * i, rad + 18); const isHovered = hoveredIdx === i; return (<text key={i} x={labelPt.x} y={labelPt.y} textAnchor="middle" dominantBaseline="middle" fill={isHovered ? '#fff' : '#9ca3af'} fontSize={isHovered ? '12' : '11'} fontWeight={isHovered ? 'bold' : 'normal'}>{k.label}</text>); })}
+                    {keys.map((k, i) => { const outerPt = getPoint(angleStep * i, rad + 18); return (<circle key={`hover-${i}`} cx={outerPt.x} cy={outerPt.y} r={18} fill="transparent" style={{ cursor: 'pointer' }} onMouseEnter={() => setHoveredIdx(i)} onMouseLeave={() => setHoveredIdx(null)} />); })}
+                  </svg>
+                  {hoveredIdx !== null && (() => {
+                    const k = keys[hoveredIdx];
+                    const myVal = myRaw[k.key]; const opVal = opRaw[k.key];
+                    const isBetter = myVal >= opVal;
+                    const diff = opVal !== 0 ? ((myVal - opVal) / opVal * 100) : 0;
+                    const labelPt = getPoint(angleStep * hoveredIdx, rad + 18);
+                    const leftAlign = labelPt.x < 140;
+                    return (
+                      <div style={{ position: 'absolute', left: labelPt.x + (leftAlign ? -160 : 20), top: labelPt.y - 50, backgroundColor: 'rgba(17,24,39,0.97)', border: '1px solid #3b82f6', borderRadius: '10px', padding: '10px 14px', pointerEvents: 'none', zIndex: 50, minWidth: '150px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#60a5fa', marginBottom: '8px' }}>{k.label}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{playerA}</span><span style={{ color: '#fff', fontWeight: 'bold' }}>{formatRawVal(k.key, myVal)}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span style={{ color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span><span style={{ color: '#fff', fontWeight: 'bold' }}>{formatRawVal(k.key, opVal)}</span></div>
+                          <div style={{ marginTop: '4px', paddingTop: '6px', borderTop: '1px solid #374151', color: isBetter ? '#60a5fa' : '#f87171', fontWeight: 'bold', textAlign: 'center', fontSize: '11px' }}>{playerA} {isBetter ? `+${Math.abs(diff).toFixed(1)}% ▲` : `-${Math.abs(diff).toFixed(1)}% ▼`}</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                  <span style={{ color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span>
-                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{formatRawVal(k.key, opVal)}</span>
-                </div>
-                <div style={{
-                  marginTop: '4px', paddingTop: '6px', borderTop: '1px solid #374151',
-                  color: isBetter ? '#60a5fa' : '#f87171',
-                  fontWeight: 'bold', textAlign: 'center', fontSize: '11px'
-                }}>
-                  {playerA} {isBetter ? `+${Math.abs(diff).toFixed(1)}% ▲` : `-${Math.abs(diff).toFixed(1)}% ▼`}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '160px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#3b82f6' }} /><span style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 'bold' }}>{playerA}</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#ef4444' }} /><span style={{ fontSize: '13px', color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span></div>
+                  <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {keys.map(k => {
+                      const myVal = myRaw[k.key]; const opVal = opRaw[k.key];
+                      const isBetter = myVal >= opVal;
+                      const diff = opVal !== 0 ? ((myVal - opVal) / opVal * 100) : 0;
+                      const diffStr = diff === 0 ? '동률' : `${isBetter ? '+' : ''}${diff.toFixed(1)}%`;
+                      return (
+                        <div key={k.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#6b7280', width: '26px', flexShrink: 0 }}>{k.label}</span>
+                          <span style={{ color: isBetter ? '#60a5fa' : '#f87171', fontWeight: 'bold', flexShrink: 0 }}>{isBetter ? '▲' : '▼'} {diffStr}</span>
+                          <span style={{ fontSize: '10px', flexShrink: 0 }}>{isBetter ? <span style={{ color: '#60a5fa' }}>{playerA}</span> : <span style={{ color: '#f87171' }}>{opNickname}</span>} 우세</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* 범례 + 수치 비교 (기존 그대로) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '160px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#3b82f6' }} />
-          <span style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 'bold' }}>{playerA}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '14px', height: '4px', borderRadius: '2px', backgroundColor: '#ef4444' }} />
-          <span style={{ fontSize: '13px', color: '#f87171', fontWeight: 'bold' }}>{opNickname}</span>
-        </div>
-        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {keys.map(k => {
-            const myVal = myRaw[k.key];
-            const opVal = opRaw[k.key];
-            const isBetter = myVal >= opVal;
-            const diff = opVal !== 0 ? ((myVal - opVal) / opVal * 100) : 0;
-            const diffStr = diff === 0 ? '동률' : `${isBetter ? '+' : ''}${diff.toFixed(1)}%`;
-            return (
-              <div key={k.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#6b7280', width: '26px', flexShrink: 0 }}>{k.label}</span>
-                <span style={{ color: isBetter ? '#60a5fa' : '#f87171', fontWeight: 'bold', flexShrink: 0 }}>
-                  {isBetter ? '▲' : '▼'} {diffStr}
-                </span>
-                <span style={{ fontSize: '10px', flexShrink: 0 }}>
-                  {isBetter
-                    ? <span style={{ color: '#60a5fa' }}>{playerA}</span>
-                    : <span style={{ color: '#f87171' }}>{opNickname}</span>
-                  } 우세
-                </span>
-              </div>
             );
-          })}
+          })()}
         </div>
-      </div>
-    </div>
-  );
-})()}
-</div>
-        {/* 경기 목록 */}
         <div style={{ backgroundColor: '#1f2937', borderRadius: '14px', padding: '0px 24px', border: '1px solid #374151' }}>
           <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '16px' }}>🗂️ 경기 목록</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {st.games.map((g, gi) => (
-              <div
-    key={gi}
-    onClick={() => onNavigateToMatch(g.matchId)}   // ← 추가
-    style={{
-      display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
-      gap: '12px', backgroundColor: '#111827', borderRadius: '10px',
-      padding: '12px 16px', border: '1px solid #374151',
-      cursor: 'pointer', transition: '0.15s'          // ← cursor 추가
-    }}
-    onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}   // ← 추가
-    onMouseLeave={e => e.currentTarget.style.borderColor = '#374151'}   // ← 추가
-  >
+              <div key={gi} onClick={() => onNavigateToMatch(g.matchId)} style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '12px', backgroundColor: '#111827', borderRadius: '10px', padding: '12px 16px', border: '1px solid #374151', cursor: 'pointer', transition: '0.15s' }} onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'} onMouseLeave={e => e.currentTarget.style.borderColor = '#374151'}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <img src={getChampImgUrl(g.my.champion)} style={{ width: '34px', height: '34px', borderRadius: '7px', border: `2px solid ${g.myIsWin ? '#3b82f6' : '#374151'}` }} alt="" />
                   <div>
@@ -1218,9 +1021,7 @@ const opRaw = {
                   <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '24px', justifyContent: 'flex-end' }}>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>승 / 패</div>
-                      <div style={{ fontSize: '15px', fontWeight: 'bold' }}>
-                        <span style={{ color: '#60a5fa' }}>{r.wins}</span><span style={{ color: '#4b5563', margin: '0 4px' }}>/</span><span style={{ color: '#f87171' }}>{r.losses}</span>
-                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: 'bold' }}><span style={{ color: '#60a5fa' }}>{r.wins}</span><span style={{ color: '#4b5563', margin: '0 4px' }}>/</span><span style={{ color: '#f87171' }}>{r.losses}</span></div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>승률</div>
@@ -1277,110 +1078,42 @@ function Leaderboard({ allStats, matches, isMobile }) {
     { id: 'totalMultiKills', label: '💥 다중킬 점수', color: '#a78bfa', unit: 'pt' },
   ];
 
-  // 단일 경기 기록
- const recordCategories = [
-  { id: 'longestGame', label: '최장 경기', color: '#60a5fa', unit: '' },
-  { id: 'shortestGame', label: '최단 경기', color: '#34d399', unit: '' },
-  { id: 'mostKills', label: '단일 경기 최다 킬', color: '#f87171', unit: '킬' },
-  { id: 'mostAssists', label: '단일 경기 최다 어시', color: '#34d399', unit: '어시' },
-  { id: 'mostDamage', label: '단일 경기 최다 딜', color: '#fca5a5', unit: '' },
-  { id: 'mostCs', label: '단일 경기 최다 CS', color: '#a78bfa', unit: 'CS' },
-  { id: 'mostGold', label: '단일 경기 최다 골드', color: '#fbbf24', unit: '' },
-  { id: 'mostVision', label: '단일 경기 최다 시야', color: '#38bdf8', unit: '' },
-  { id: 'mostDpm', label: '단일 경기 최고 DPM', color: '#f97316', unit: 'DPM' },
-  { id: 'mostGpm', label: '단일 경기 최고 GPM', color: '#eab308', unit: 'GPM' },
-];
+  const recordCategories = [
+    { id: 'longestGame', label: '최장 경기', color: '#60a5fa', unit: '' },
+    { id: 'shortestGame', label: '최단 경기', color: '#34d399', unit: '' },
+    { id: 'mostKills', label: '단일 경기 최다 킬', color: '#f87171', unit: '킬' },
+    { id: 'mostAssists', label: '단일 경기 최다 어시', color: '#34d399', unit: '어시' },
+    { id: 'mostDamage', label: '단일 경기 최다 딜', color: '#fca5a5', unit: '' },
+    { id: 'mostCs', label: '단일 경기 최다 CS', color: '#a78bfa', unit: 'CS' },
+    { id: 'mostGold', label: '단일 경기 최다 골드', color: '#fbbf24', unit: '' },
+    { id: 'mostVision', label: '단일 경기 최다 시야', color: '#38bdf8', unit: '' },
+    { id: 'mostDpm', label: '단일 경기 최고 DPM', color: '#f97316', unit: 'DPM' },
+    { id: 'mostGpm', label: '단일 경기 최고 GPM', color: '#eab308', unit: 'GPM' },
+  ];
 
-  const durationToSeconds = (dur) => {
-    const [min, sec] = (dur || '0:00').split(':').map(Number);
-    return (min || 0) * 60 + (sec || 0);
-  };
+  const durationToSeconds = (dur) => { const [min, sec] = (dur || '0:00').split(':').map(Number); return (min || 0) * 60 + (sec || 0); };
 
   const recordData = (() => {
     const result = {};
-
-    // 경기 기반 기록 (최장/최단)
-    const matchDurations = matches.map(m => ({
-      matchId: m.id,
-      date: m.match_date,
-      duration: m.duration,
-      seconds: durationToSeconds(m.duration),
-      winTeam: m.win_team,
-    }));
-
+    const matchDurations = matches.map(m => ({ matchId: m.id, date: m.match_date, duration: m.duration, seconds: durationToSeconds(m.duration), winTeam: m.win_team }));
     const longest = [...matchDurations].sort((a, b) => b.seconds - a.seconds)[0];
     const shortest = [...matchDurations].sort((a, b) => a.seconds - b.seconds)[0];
-
-    const getLongestPlayers = (matchId) =>
-      allStats.filter(s => String(s.match_id) === String(matchId)).map(s => s.nickname);
-
-    result.longestGame = longest ? {
-      value: longest.duration,
-      date: longest.date,
-      matchId: longest.matchId,
-      players: getLongestPlayers(longest.matchId),
-      sub: `${longest.winTeam} 승`,
-    } : null;
-
-    result.shortestGame = shortest ? {
-      value: shortest.duration,
-      date: shortest.date,
-      matchId: shortest.matchId,
-      players: getLongestPlayers(shortest.matchId),
-      sub: `${shortest.winTeam} 승`,
-    } : null;
-
-    // 플레이어 기반 기록
+    const getLongestPlayers = (matchId) => allStats.filter(s => String(s.match_id) === String(matchId)).map(s => s.nickname);
+    result.longestGame = longest ? { value: longest.duration, date: longest.date, matchId: longest.matchId, players: getLongestPlayers(longest.matchId), sub: `${longest.winTeam} 승` } : null;
+    result.shortestGame = shortest ? { value: shortest.duration, date: shortest.date, matchId: shortest.matchId, players: getLongestPlayers(shortest.matchId), sub: `${shortest.winTeam} 승` } : null;
     const playerRecords = allStats.map(s => {
       const match = matches.find(m => String(m.id) === String(s.match_id));
       const [min, sec] = (match?.duration || '20:00').split(':').map(Number);
       const mTotal = (min || 20) + (sec / 60 || 0);
-      const deaths = Number(s.deaths || 0);
-      const ka = Number(s.kills || 0) + Number(s.assists || 0);
-      const kda = deaths === 0 ? (ka > 0 ? 99999 : 0) : ka / deaths;
-      return {
-        nickname: s.nickname,
-        champion: s.champion,
-        matchId: s.match_id,
-        date: match?.match_date || '-',
-        duration: match?.duration || '-',
-        lane: String(s.lane || '').toUpperCase().trim(),
-        kills: Number(s.kills || 0),
-        deaths,
-        assists: Number(s.assists || 0),
-        damage: Number(s.damage || 0),
-        cs: Number(s.cs || 0),
-        gold: Number(s.gold || 0),
-        vision: Number(s.vision_score || 0),
-        dpm: Math.round(Number(s.damage || 0) / mTotal),
-        gpm: Math.round(Number(s.gold || 0) / mTotal),
-        kda,
-        kdaStr: deaths === 0 ? (ka > 0 ? 'Perfect' : '0.00') : kda.toFixed(2),
-        multiKill: s.multi_kill,
-      };
+      const deaths = Number(s.deaths || 0); const ka = Number(s.kills || 0) + Number(s.assists || 0);
+      return { nickname: s.nickname, champion: s.champion, matchId: s.match_id, date: match?.match_date || '-', duration: match?.duration || '-', lane: String(s.lane || '').toUpperCase().trim(), kills: Number(s.kills || 0), deaths, assists: Number(s.assists || 0), damage: Number(s.damage || 0), cs: Number(s.cs || 0), gold: Number(s.gold || 0), vision: Number(s.vision_score || 0), dpm: Math.round(Number(s.damage || 0) / mTotal), gpm: Math.round(Number(s.gold || 0) / mTotal) };
     });
-
     const makeRecord = (arr, key, label, unit, formatter) => {
       const sorted = [...arr].sort((a, b) => b[key] - a[key]);
       const top = sorted[0];
       if (!top) return null;
-      return {
-        nickname: top.nickname,
-        champion: top.champion,
-        value: formatter ? formatter(top[key]) : top[key].toLocaleString(),
-        rawValue: top[key],
-        unit,
-        date: top.date,
-        duration: top.duration,
-        lane: top.lane,
-        matchId: top.matchId,
-        kills: top.kills,
-        deaths: top.deaths,
-        assists: top.assists,
-        sub: `${top.kills}/${top.deaths}/${top.assists} · ${top.duration}`,
-      };
+      return { nickname: top.nickname, champion: top.champion, value: formatter ? formatter(top[key]) : top[key].toLocaleString(), rawValue: top[key], unit, date: top.date, duration: top.duration, lane: top.lane, matchId: top.matchId, kills: top.kills, deaths: top.deaths, assists: top.assists, sub: `${top.kills}/${top.deaths}/${top.assists} · ${top.duration}` };
     };
-
     result.mostKills = makeRecord(playerRecords, 'kills', '최다 킬', '킬');
     result.mostAssists = makeRecord(playerRecords, 'assists', '최다 어시', '어시');
     result.mostDamage = makeRecord(playerRecords, 'damage', '최다 딜', '딜', v => v.toLocaleString());
@@ -1389,26 +1122,20 @@ function Leaderboard({ allStats, matches, isMobile }) {
     result.mostVision = makeRecord(playerRecords, 'vision', '최다 시야', '점');
     result.mostDpm = makeRecord(playerRecords, 'dpm', '최고 DPM', 'DPM', v => v.toLocaleString());
     result.mostGpm = makeRecord(playerRecords, 'gpm', '최고 GPM', 'GPM', v => v.toLocaleString());
-
-
     return result;
   })();
 
   const normalizeLane = (raw) => { const u = String(raw || '').toUpperCase().trim(); const map = { 'JUNGLE': 'JNG', 'BOT': 'ADC', 'SUPPORT': 'SUP' }; return map[u] || u; };
 
-  // 평균 지표 랭킹
   const rankings = (() => {
     const nicknames = [...new Set(allStats.map(s => s.nickname))];
     return nicknames.map(nickname => {
-      const laneStats = avgScope === 'lane'
-        ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname)
-        : allStats.filter(s => s.nickname === nickname);
+      const laneStats = avgScope === 'lane' ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname) : allStats.filter(s => s.nickname === nickname);
       if (laneStats.length < 5) return null;
       let tMin = 0, tDmg = 0, tDmgTaken = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0, tWins = 0, tKpSum = 0;
       const count = laneStats.length;
       laneStats.forEach(s => {
-        const [min, sec] = (s.matches?.duration || '20:00').split(':').map(Number);
-        const m = (min || 20) + (sec / 60 || 0); tMin += m;
+        const [min, sec] = (s.matches?.duration || '20:00').split(':').map(Number); const m = (min || 20) + (sec / 60 || 0); tMin += m;
         tDmg += Number(s.damage || 0); tDmgTaken += Number(s.damage_taken || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0); tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0);
         const mySide = String(s.side || '').trim().toLowerCase(); const winSide = String(s.matches?.win_team || '').trim().toLowerCase();
         if (mySide && winSide && mySide === winSide) tWins++;
@@ -1422,13 +1149,10 @@ function Leaderboard({ allStats, matches, isMobile }) {
     }).filter(Boolean);
   })();
 
-  // 누적 기록 랭킹
   const totalRankings = (() => {
     const nicknames = [...new Set(allStats.map(s => s.nickname))];
     return nicknames.map(nickname => {
-      const stats = totalScope === 'lane'
-        ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname)
-        : allStats.filter(s => s.nickname === nickname);
+      const stats = totalScope === 'lane' ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname) : allStats.filter(s => s.nickname === nickname);
       if (stats.length === 0) return null;
       const totalKills = stats.reduce((sum, s) => sum + Number(s.kills || 0), 0);
       const totalAssists = stats.reduce((sum, s) => sum + Number(s.assists || 0), 0);
@@ -1461,7 +1185,6 @@ function Leaderboard({ allStats, matches, isMobile }) {
     return typeof row[selectedMetric] === 'number' ? row[selectedMetric].toLocaleString() : row[selectedMetric];
   };
 
-  // 경기 기록 카드
   const RecordCard = ({ category, data }) => {
     if (!data) return (
       <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: '1px solid #374151', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1469,94 +1192,44 @@ function Leaderboard({ allStats, matches, isMobile }) {
         <div style={{ fontSize: '13px', color: '#4b5563' }}>데이터 없음</div>
       </div>
     );
-
     const isMatchRecord = category.id === 'longestGame' || category.id === 'shortestGame';
-
     return (
       <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: `1px solid ${category.color}33`, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {/* 카테고리 라벨 */}
-        <div style={{ fontSize: '12px', color: category.color, fontWeight: 'bold', letterSpacing: '0.5px' }}>
-          {category.label}
-        </div>
-
+        <div style={{ fontSize: '12px', color: category.color, fontWeight: 'bold', letterSpacing: '0.5px' }}>{category.label}</div>
         {isMatchRecord ? (
-          // 경기 기반 카드 (최장/최단)
           <div>
-            <div style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>
-              {data.value}
-            </div>
+            <div style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{data.value}</div>
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>{data.date} · {data.sub}</div>
           </div>
         ) : (
-  // 플레이어 기반 카드
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', alignItems: 'center', gap: '8px' }}>
-    {/* 왼쪽: 챔피언 이미지 */}
-    <div style={{ display: 'flex', justifyContent: 'center', paddingRight: '80px' }}>
-      <img
-        src={getChampImgUrl(data.champion)}
-        alt=""
-        style={{ width: '44px', height: '44px', borderRadius: '10px', border: `2px solid ${category.color}`, flexShrink: 0 }}
-      />
-    </div>
-
-    {/* 가운데: 닉네임 */}
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff' }}>{data.nickname}</div>
-      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
-        {getChampKoName(data.champion)} · {data.lane}
-      </div>
-      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{data.sub}</div>
-    </div>
-
-    {/* 오른쪽: 수치 */}
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '900', color: category.color, lineHeight: 1 }}>
-        {data.value}
-      </div>
-      {data.unit && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{data.unit}</div>}
-    </div>
-  </div>
-)}
-
-        {/* 날짜 */}
-        <div style={{ fontSize: '11px', color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: '8px' }}>
-          📅 {data.date} · ⏱️ {data.duration || data.value}
-        </div>
-
-        {/* 펜타킬 전체 목록 */}
-        {category.id === 'mostPenta' && data.allPenta && data.allPenta.length > 1 && (
-          <div style={{ borderTop: '1px solid #1f2937', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>전체 펜타킬 기록 ({data.allPenta.length}회)</div>
-            {data.allPenta.map((p, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                <img src={getChampImgUrl(p.champion)} alt="" style={{ width: '22px', height: '22px', borderRadius: '4px', border: '1px solid #374151' }} />
-                <span style={{ color: '#fff', fontWeight: 'bold' }}>{p.nickname}</span>
-                <span style={{ color: '#9ca3af' }}>{getChampKoName(p.champion)}</span>
-                <span style={{ color: '#6b7280', marginLeft: 'auto' }}>{p.date}</span>
-              </div>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', paddingRight: '80px' }}>
+              <img src={getChampImgUrl(data.champion)} alt="" style={{ width: '44px', height: '44px', borderRadius: '10px', border: `2px solid ${category.color}`, flexShrink: 0 }} />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff' }}>{data.nickname}</div>
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{getChampKoName(data.champion)} · {data.lane}</div>
+              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{data.sub}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '900', color: category.color, lineHeight: 1 }}>{data.value}</div>
+              {data.unit && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{data.unit}</div>}
+            </div>
           </div>
         )}
+        <div style={{ fontSize: '11px', color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: '8px' }}>📅 {data.date} · ⏱️ {data.duration || data.value}</div>
       </div>
     );
   };
 
   return (
     <div>
-      {/* 모드 전환 버튼 */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        <button onClick={() => setMode('avg')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'avg' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'avg' ? '#1e3a5f' : '#111827', color: mode === 'avg' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>
-          📊 평균 지표
-        </button>
-        <button onClick={() => setMode('total')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'total' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'total' ? '#431407' : '#111827', color: mode === 'total' ? '#f97316' : '#9ca3af', transition: '0.2s' }}>
-          🎖️ 누적 기록
-        </button>
-        <button onClick={() => setMode('record')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'record' ? '1px solid #a855f7' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'record' ? '#2e1065' : '#111827', color: mode === 'record' ? '#a855f7' : '#9ca3af', transition: '0.2s' }}>
-          🏅 경기 기록
-        </button>
+        <button onClick={() => setMode('avg')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'avg' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'avg' ? '#1e3a5f' : '#111827', color: mode === 'avg' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>📊 평균 지표</button>
+        <button onClick={() => setMode('total')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'total' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'total' ? '#431407' : '#111827', color: mode === 'total' ? '#f97316' : '#9ca3af', transition: '0.2s' }}>🎖️ 누적 기록</button>
+        <button onClick={() => setMode('record')} style={{ padding: '8px 20px', borderRadius: '10px', border: mode === 'record' ? '1px solid #a855f7' : '1px solid #374151', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backgroundColor: mode === 'record' ? '#2e1065' : '#111827', color: mode === 'record' ? '#a855f7' : '#9ca3af', transition: '0.2s' }}>🏅 경기 기록</button>
       </div>
 
-      {/* 평균 지표 모드 */}
       {mode === 'avg' && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -1564,18 +1237,12 @@ function Leaderboard({ allStats, matches, isMobile }) {
             <button onClick={() => setAvgScope('lane')} style={{ padding: '6px 16px', borderRadius: '8px', border: avgScope === 'lane' ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: avgScope === 'lane' ? '#1e3a5f' : '#111827', color: avgScope === 'lane' ? '#60a5fa' : '#9ca3af', transition: '0.2s' }}>라인별</button>
             {avgScope === 'lane' && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {lanes.map(lane => (
-                  <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: isMobile ? '6px 12px' : '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>
-                ))}
+                {lanes.map(lane => (<button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: isMobile ? '6px 12px' : '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>))}
               </div>
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
-            {metrics.map(m => (
-              <button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827', color: selectedMetric === m.id ? m.color : '#9ca3af' }}>
-                {m.label}{!isMobile && <span style={{ fontSize: '11px', opacity: 0.6, marginLeft: '4px' }}>{m.desc}</span>}
-              </button>
-            ))}
+            {metrics.map(m => (<button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827', color: selectedMetric === m.id ? m.color : '#9ca3af' }}>{m.label}{!isMobile && <span style={{ fontSize: '11px', opacity: 0.6, marginLeft: '4px' }}>{m.desc}</span>}</button>))}
           </div>
           {sortedAvg.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>5경기 이상 데이터가 없습니다</p></div>
@@ -1585,16 +1252,11 @@ function Leaderboard({ allStats, matches, isMobile }) {
                 const medal = medalColor(i); const isTop3 = i < 3;
                 return (
                   <div key={row.nickname} style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: isTop3 ? `${medal}11` : i % 2 === 0 ? '#1a2030' : '#1f2937', borderRadius: '14px', padding: isMobile ? '12px 14px' : '14px 24px', border: isTop3 ? `1px solid ${medal}55` : '1px solid #374151' }}>
-                    <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>
-                      {isTop3 ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span> : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>}
-                    </div>
+                    <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>{isTop3 ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span> : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>}</div>
                     <img src={getChampImgUrl(row.mostChamp)} alt="" style={{ width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0, border: `2px solid ${medal || '#374151'}` }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#fff' }}>{row.nickname}</div>
-                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>
-                        {row.games}경기 · 승률
-                        <span style={{ color: row.winRate >= 50 ? '#60a5fa' : '#f87171', fontWeight: 'bold', marginLeft: '4px' }}>{row.winRate}%</span>
-                      </div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>{row.games}경기 · 승률<span style={{ color: row.winRate >= 50 ? '#60a5fa' : '#f87171', fontWeight: 'bold', marginLeft: '4px' }}>{row.winRate}%</span></div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: metricInfo.color }}>{formatVal(row)}</div>
@@ -1608,7 +1270,6 @@ function Leaderboard({ allStats, matches, isMobile }) {
         </>
       )}
 
-      {/* 누적 기록 모드 */}
       {mode === 'total' && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -1616,31 +1277,22 @@ function Leaderboard({ allStats, matches, isMobile }) {
             <button onClick={() => setTotalScope('lane')} style={{ padding: '6px 16px', borderRadius: '8px', border: totalScope === 'lane' ? '1px solid #f97316' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: totalScope === 'lane' ? '#431407' : '#111827', color: totalScope === 'lane' ? '#f97316' : '#9ca3af', transition: '0.2s' }}>라인별</button>
             {totalScope === 'lane' && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {lanes.map(lane => (
-                  <button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>
-                ))}
+                {lanes.map(lane => (<button key={lane} onClick={() => setSelectedLane(lane)} style={{ padding: '6px 14px', borderRadius: '8px', border: selectedLane === lane ? '1px solid #60a5fa' : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedLane === lane ? '#3b82f6' : '#111827', color: selectedLane === lane ? '#fff' : '#9ca3af', transition: '0.2s' }}>{lane}</button>))}
               </div>
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
-            {totalMetrics.map(m => (
-              <button key={m.id} onClick={() => setSelectedTotal(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedTotal === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedTotal === m.id ? `${m.color}22` : '#111827', color: selectedTotal === m.id ? m.color : '#9ca3af' }}>
-                {m.label}
-              </button>
-            ))}
+            {totalMetrics.map(m => (<button key={m.id} onClick={() => setSelectedTotal(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedTotal === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedTotal === m.id ? `${m.color}22` : '#111827', color: selectedTotal === m.id ? m.color : '#9ca3af' }}>{m.label}</button>))}
           </div>
           {sortedTotal.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>데이터가 없습니다</p></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {sortedTotal.map((row, i) => {
-                const medal = medalColor(i); const isTop3 = i < 3;
-                const val = row[selectedTotal];
+                const medal = medalColor(i); const isTop3 = i < 3; const val = row[selectedTotal];
                 return (
                   <div key={row.nickname} style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: isTop3 ? `${medal}11` : i % 2 === 0 ? '#1a2030' : '#1f2937', borderRadius: '14px', padding: isMobile ? '12px 14px' : '14px 24px', border: isTop3 ? `1px solid ${medal}55` : '1px solid #374151' }}>
-                    <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>
-                      {isTop3 ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span> : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>}
-                    </div>
+                    <div style={{ width: '36px', flexShrink: 0, textAlign: 'center' }}>{isTop3 ? <span style={{ fontSize: '24px' }}>{medalEmoji(i)}</span> : <span style={{ fontSize: '17px', fontWeight: '900', color: '#4b5563' }}>{i + 1}</span>}</div>
                     <img src={getChampImgUrl(row.mostChamp)} alt="" style={{ width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0, border: `2px solid ${medal || '#374151'}` }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#fff' }}>{row.nickname}</div>
@@ -1668,12 +1320,9 @@ function Leaderboard({ allStats, matches, isMobile }) {
         </>
       )}
 
-      {/* 경기 기록 모드 */}
       {mode === 'record' && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '16px' }}>
-          {recordCategories.map(category => (
-            <RecordCard key={category.id} category={category} data={recordData[category.id]} />
-          ))}
+          {recordCategories.map(category => (<RecordCard key={category.id} category={category} data={recordData[category.id]} />))}
         </div>
       )}
     </div>
@@ -1702,7 +1351,27 @@ function App() {
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
   const [mainTab, setMainTab] = useState('search');
 
+  // ===== 시즌 state =====
+  const [season, setSeason] = useState('season2');
+
   useEffect(() => { fetchInitialData(); }, []);
+
+  // ===== 시즌 필터링 =====
+  const seasonMatches = (() => {
+    if (season === 'season1') return matches.filter(m => m.match_date < SEASON2_START);
+    if (season === 'season2') return matches.filter(m => m.match_date >= SEASON2_START);
+    return matches;
+  })();
+
+  const seasonMatchIds = new Set(seasonMatches.map(m => String(m.id)));
+  const seasonStats = allStats.filter(s => seasonMatchIds.has(String(s.match_id)));
+
+  const seasonWinLoss = seasonMatches.reduce((acc, m) => {
+    const winner = String(m.win_team || '').trim();
+    if (winner === 'Blue') acc.Blue += 1;
+    else if (winner === 'Red') acc.Red += 1;
+    return acc;
+  }, { Blue: 0, Red: 0 });
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -1714,12 +1383,53 @@ function App() {
         setMatches(mData);
         const stats = mData.reduce((acc, match) => { const winner = String(match.win_team || '').trim(); if (winner === 'Blue') acc.Blue += 1; else if (winner === 'Red') acc.Red += 1; return acc; }, { Blue: 0, Red: 0 });
         setWinLossStats(stats);
-        setSelectedMatchId(mData[0].id);
-        fetchMatchStats(mData[0].id);
-        setOpenDates({ [mData[0].match_date]: true });
+        // 시즌2 기준으로 첫 경기 선택
+        const season2Matches = mData.filter(m => m.match_date >= SEASON2_START);
+        const initialMatch = season2Matches.length > 0 ? season2Matches[0] : mData[0];
+        setSelectedMatchId(initialMatch.id);
+        fetchMatchStats(initialMatch.id);
+        setOpenDates({ [initialMatch.match_date]: true });
       }
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
+
+  useEffect(() => {
+  if (!allStats.length || !matches.length) return;
+
+  const fbGames = allStats.filter(s =>
+    s.first_blood === true || s.first_blood === 'true' || s.first_blood === 1
+  );
+
+  const results = fbGames.map(s => {
+    const match = matches.find(m => String(m.id) === String(s.match_id));
+    if (!match) return null;
+    const mySide = String(s.side || '').trim().toLowerCase();
+    const winSide = String(match.win_team || '').trim().toLowerCase();
+    return mySide === winSide ? 'win' : 'lose';
+  }).filter(Boolean);
+
+  const wins = results.filter(r => r === 'win').length;
+  const total = results.length;
+
+  const teamResults = matches.map(m => {
+    const fbPlayer = allStats.find(s =>
+      String(s.match_id) === String(m.id) &&
+      (s.first_blood === true || s.first_blood === 'true' || s.first_blood === 1)
+    );
+    if (!fbPlayer) return null;
+    const fbSide = String(fbPlayer.side || '').trim().toLowerCase();
+    const winSide = String(m.win_team || '').trim().toLowerCase();
+    return fbSide === winSide ? 'win' : 'lose';
+  }).filter(Boolean);
+
+  const teamWins = teamResults.filter(r => r === 'win').length;
+  const teamTotal = teamResults.length;
+
+  console.log('=== 퍼블 승률 ===');
+  console.log(`개인 기준 | ${total}회 퍼블 → 승률 ${total > 0 ? Math.round((wins / total) * 100) : 0}%`);
+  console.log(`팀 기준   | ${teamTotal}회 퍼블 → 승률 ${teamTotal > 0 ? Math.round((teamWins / teamTotal) * 100) : 0}%`);
+
+}, [allStats, matches]);
 
   const fetchMatchStats = async (matchId) => {
     try {
@@ -1732,14 +1442,25 @@ function App() {
     } catch (err) { console.error(err); }
   };
 
+  // 시즌 변경 시 첫 경기 자동 선택
+  useEffect(() => {
+    if (seasonMatches.length > 0) {
+      const first = seasonMatches[0];
+      setSelectedMatchId(first.id);
+      fetchMatchStats(first.id);
+      setOpenDates({ [first.match_date]: true });
+    }
+  }, [season]);
+
   const handlePlayerClick = (nickname, navigateToPlayer = false) => {
     try {
-      const history = allStats.filter(s => s.nickname === nickname).map(s => {
+      // 시즌 필터된 stats 기준으로 개인 지표 계산
+      const history = seasonStats.filter(s => s.nickname === nickname).map(s => {
         const mySide = String(s.side || '').trim().toLowerCase();
         const winSide = String(s.matches?.win_team || '').trim().toLowerCase();
         const [min, sec] = (s.matches?.duration || '20:00').split(':').map(Number);
         const mTotal = (min || 20) + (sec / 60 || 0);
-        const teamStats = allStats.filter(st => st.match_id === s.match_id && st.side === s.side);
+        const teamStats = seasonStats.filter(st => st.match_id === s.match_id && st.side === s.side);
         const teamTotalDmg = teamStats.reduce((sum, p) => sum + Number(p.damage || 0), 0);
         const teamTotalKills = teamStats.reduce((sum, p) => sum + Number(p.kills || 0), 0);
         const isWinResult = mySide !== '' && winSide !== '' && mySide === winSide;
@@ -1756,8 +1477,8 @@ function App() {
   };
 
   const getRankingsByLine = (nickname, field, line, currentData) => {
-    if (!allStats.length || !currentData) return null;
-    const lineStats = line === 'ALL' ? allStats : allStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
+    if (!seasonStats.length || !currentData) return null;
+    const lineStats = line === 'ALL' ? seasonStats : seasonStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
     const nicknames = [...new Set(lineStats.map(s => s.nickname))];
     const myGames = lineStats.filter(s => s.nickname === nickname).length;
     if (myGames < 5) return null;
@@ -1769,7 +1490,7 @@ function App() {
         const [min, sec] = (s.matches?.duration || '20:00').split(':').map(Number); const m = min + (sec / 60) || 20; tMin += m;
         tDmg += Number(s.damage || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0); tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0); tDtpm += Number(s.damage_taken || 0); tCW += Number(s.control_wards || 0);
         if (s.first_blood === true || s.first_blood === 'true' || s.first_blood === 1) tFB += 1;
-        const teamStats = allStats.filter(st => st.match_id === s.match_id && st.side === s.side);
+        const teamStats = seasonStats.filter(st => st.match_id === s.match_id && st.side === s.side);
         const teamDmg = teamStats.reduce((sum, p) => sum + Number(p.damage || 0), 0); const teamKills = teamStats.reduce((sum, p) => sum + Number(p.kills || 0), 0);
         tDmgShare += teamDmg > 0 ? (Number(s.damage || 0) / teamDmg) : 0; tKpSum += teamKills > 0 ? ((Number(s.kills || 0) + Number(s.assists || 0)) / teamKills) : 0;
       });
@@ -1787,8 +1508,8 @@ function App() {
   };
 
   const getRadarData = (currentData, line) => {
-    if (!currentData || !allStats.length || line === 'ALL') return [];
-    const lineStats = allStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
+    if (!currentData || !seasonStats.length || line === 'ALL') return [];
+    const lineStats = seasonStats.filter(s => String(s.lane || '').toUpperCase().trim() === line);
     const calculateLineAvg = (stats) => {
       let tMin = 0, tDmg = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0;
       stats.forEach(s => { const [min, sec] = (s.matches?.duration || '20:00').split(':').map(Number); const m = min + (sec / 60) || 20; tMin += m; tDmg += Number(s.damage || 0); tGold += Number(s.gold || 0); tCs += Number(s.cs || 0); tVis += Number(s.vision_score || 0); tK += Number(s.kills || 0); tA += Number(s.assists || 0); tD += Number(s.deaths || 0); });
@@ -1822,15 +1543,14 @@ function App() {
   const currentData = getFilteredData();
   const radarData = (selectedPlayer && currentData) ? getRadarData(currentData, selectedLine) : [];
 
-  const searchResults = [...new Set(allStats.map(s => s.nickname))].filter(name => name.toLowerCase().includes(searchTerm.toLowerCase())).map(name => { const pHistory = allStats.filter(s => s.nickname === name); const wins = pHistory.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length; return { nickname: name, totalGames: pHistory.length, winRate: Math.round((wins / pHistory.length) * 100), mostLane: Object.entries(pHistory.reduce((acc, curr) => { const lane = String(curr.lane || 'MID').toUpperCase(); acc[lane] = (acc[lane] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0][0] }; });
-  const playerSearchResults = [...new Set(allStats.map(s => s.nickname))].filter(name => name.toLowerCase().includes(playerSearchTerm.toLowerCase())).map(name => { const pHistory = allStats.filter(s => s.nickname === name); const wins = pHistory.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length; return { nickname: name, totalGames: pHistory.length, winRate: Math.round((wins / pHistory.length) * 100), mostLane: Object.entries(pHistory.reduce((acc, curr) => { const lane = String(curr.lane || 'MID').toUpperCase(); acc[lane] = (acc[lane] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0][0] }; });
+  const searchResults = [...new Set(seasonStats.map(s => s.nickname))].filter(name => name.toLowerCase().includes(searchTerm.toLowerCase())).map(name => { const pHistory = seasonStats.filter(s => s.nickname === name); const wins = pHistory.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length; return { nickname: name, totalGames: pHistory.length, winRate: Math.round((wins / pHistory.length) * 100), mostLane: Object.entries(pHistory.reduce((acc, curr) => { const lane = String(curr.lane || 'MID').toUpperCase(); acc[lane] = (acc[lane] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0][0] }; });
+  const playerSearchResults = [...new Set(seasonStats.map(s => s.nickname))].filter(name => name.toLowerCase().includes(playerSearchTerm.toLowerCase())).map(name => { const pHistory = seasonStats.filter(s => s.nickname === name); const wins = pHistory.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length; return { nickname: name, totalGames: pHistory.length, winRate: Math.round((wins / pHistory.length) * 100), mostLane: Object.entries(pHistory.reduce((acc, curr) => { const lane = String(curr.lane || 'MID').toUpperCase(); acc[lane] = (acc[lane] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0][0] }; });
 
   const toggleDate = (date) => { setOpenDates(prev => ({ ...prev, [date]: !prev[date] })); };
-  const groupedMatches = matches.reduce((acc, match) => { if (!acc[match.match_date]) acc[match.match_date] = []; acc[match.match_date].push(match); return acc; }, {});
+  const groupedMatches = seasonMatches.reduce((acc, match) => { if (!acc[match.match_date]) acc[match.match_date] = []; acc[match.match_date].push(match); return acc; }, {});
 
   if (loading) return <div style={{ color: '#fff', textAlign: 'center', marginTop: '100px' }}>데이터 로딩 중...</div>;
 
-  /* ---- 탭 정의 (AI 탭 제거) ---- */
   const tabList = [
     { id: 'search', icon: '🔍', label: '전적 검색' },
     { id: 'champion', icon: '⚔️', label: '챔피언 분석' },
@@ -1839,19 +1559,59 @@ function App() {
     { id: 'leaderboard', icon: '🏆', label: '리더보드' },
   ];
 
+  const seasonLabel = season === 'season1' ? '시즌 1' : season === 'season2' ? '시즌 2' : '통합';
+  const seasonColor = season === 'season1' ? '#a78bfa' : season === 'season2' ? '#3b82f6' : '#10b981';
+
   return (
     <div style={{ backgroundColor: '#0a0e17', minHeight: '100vh', width: '100%', margin: 0, padding: 0, color: '#f3f4f6', overflowX: 'hidden' }}>
 
       {/* ===== 헤더 ===== */}
-      <header style={{ textAlign: 'center', padding: isMobile ? '30px 0 0' : '80px 0 0', background: 'linear-gradient(to bottom, #1e293b 0%, #0a0e17 100%)', borderBottom: '1px solid #1e293b' }}>
-        <h1 style={{ fontSize: isMobile ? '36px' : '64px', fontWeight: '900', margin: isMobile ? '0 0 16px' : '0 0 40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', lineHeight: '1.2' }}>
+      <header style={{ textAlign: 'center', padding: isMobile ? '30px 0 0' : '60px 0 0', background: 'linear-gradient(to bottom, #1e293b 0%, #0a0e17 100%)', borderBottom: '1px solid #1e293b' }}>
+        <h1 style={{ fontSize: isMobile ? '36px' : '64px', fontWeight: '900', margin: isMobile ? '0 0 16px' : '0 0 24px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', lineHeight: '1.2' }}>
           <span style={{ background: 'linear-gradient(180deg,#ffffff 30%,#a1a1aa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>방주</span>
           <span style={{ color: '#3b82f6', fontStyle: 'italic', textShadow: '0 0 30px rgba(59,130,246,0.6)' }}>.GG</span>
         </h1>
 
-        {/* PC 탭 네비게이션 */}
+        {/* ===== 시즌 탭 (최상위) ===== */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: isMobile ? '0' : '0', padding: isMobile ? '0 12px 12px' : '0 0 20px' }}>
+          {[
+            { key: 'season1', label: '시즌 1', color: '#a78bfa', bg: '#2e1065' },
+            { key: 'season2', label: '시즌 2', color: '#3b82f6', bg: '#1e3a5f' },
+            { key: 'all', label: '통합', color: '#10b981', bg: '#064e3b' },
+          ].map(({ key, label, color, bg }) => (
+            <button
+              key={key}
+              onClick={() => { setSeason(key); setSelectedPlayer(null); }}
+              style={{
+                padding: isMobile ? '8px 16px' : '10px 28px',
+                borderRadius: '12px',
+                border: season === key ? `2px solid ${color}` : '1px solid #374151',
+                cursor: 'pointer',
+                fontSize: isMobile ? '13px' : '15px',
+                fontWeight: 'bold',
+                backgroundColor: season === key ? bg : '#111827',
+                color: season === key ? color : '#6b7280',
+                transition: '0.2s',
+                boxShadow: season === key ? `0 0 16px ${color}44` : 'none',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* 시즌 배지 */}
         {!isMobile && (
-          <div style={{ display: 'flex', justifyContent: 'center', borderBottom: '2px solid #1e293b' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', color: seasonColor, backgroundColor: `${seasonColor}22`, border: `1px solid ${seasonColor}44`, borderRadius: '20px', padding: '3px 14px', fontWeight: 'bold' }}>
+              {seasonLabel} : {seasonMatches.length}경기
+            </span>
+          </div>
+        )}
+
+        {/* PC 서브 탭 네비게이션 */}
+        {!isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', borderBottom: '2px solid #1e293b', marginTop: '8px' }}>
             {tabList.map(tab => (
               <button key={tab.id} onClick={() => setMainTab(tab.id)} style={{ padding: '14px 36px', border: 'none', borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent', backgroundColor: 'transparent', color: mainTab === tab.id ? '#60a5fa' : tab.id === 'player' && selectedPlayer ? '#a78bfa' : '#6b7280', fontSize: '15px', fontWeight: mainTab === tab.id ? '700' : '500', cursor: 'pointer', transition: '0.2s', marginBottom: '-2px', letterSpacing: '0.3px' }}>
                 {tab.icon} {tab.label}
@@ -1884,9 +1644,8 @@ function App() {
             </section>
 
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '16px' : '25px' }}>
-              {/* 경기 기록 */}
-              <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '14px' : '25px', borderRadius: '16px', maxHeight: isMobile ? '280px' : '350px', display: 'flex', flexDirection: 'column' }}>
-                <h2 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: isMobile ? '14px' : '20px', color: '#fff' }}>⚔️ 경기 기록</h2>
+              <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '14px' : '25px', borderRadius: '16px', minHeight: isMobile ? '280px' : '350px', maxHeight: isMobile ? '280px' : '350px', display: 'flex', flexDirection: 'column' }}>
+                <h2 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: isMobile ? '14px' : '20px', color: '#fff' }}>⚔️ 경기 기록 <span style={{ fontSize: '12px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
                 <div className="custom-scroll" style={{ overflowY: 'auto', gap: '8px', display: 'flex', flexDirection: 'column' }}>
                   {Object.keys(groupedMatches).map(date => (
                     <div key={date}>
@@ -1906,15 +1665,20 @@ function App() {
                       )}
                     </div>
                   ))}
+                  {Object.keys(groupedMatches).length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#4b5563' }}>
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📭</div>
+                      <p style={{ fontSize: '14px' }}>{seasonLabel} 경기 데이터가 없습니다</p>
+                    </div>
+                  )}
                 </div>
               </section>
 
-              {/* 진영 승률 */}
-              <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '14px' : '25px', borderRadius: '16px', position: 'relative', height: isMobile ? '200px' : '350px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <h2 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: '10px', width: '100%', color: '#fff' }}>📊 진영 승률</h2>
+              <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '14px' : '25px', borderRadius: '16px', position: 'relative', minHeight: isMobile ? '200px' : '350px', height: isMobile ? '200px' : '350px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <h2 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: '10px', width: '100%', color: '#fff' }}>📊 진영 승률 <span style={{ fontSize: '12px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
                 <ResponsiveContainer width="100%" height={isMobile ? 130 : 220}>
                   <PieChart>
-                    <Pie data={[{ name: 'Blue', value: winLossStats.Blue }, { name: 'Red', value: winLossStats.Red }]} innerRadius={isMobile ? 45 : 70} outerRadius={isMobile ? 65 : 100} paddingAngle={3} dataKey="value" stroke="none">
+                    <Pie data={[{ name: 'Blue', value: seasonWinLoss.Blue }, { name: 'Red', value: seasonWinLoss.Red }]} innerRadius={isMobile ? 45 : 70} outerRadius={isMobile ? 65 : 100} paddingAngle={3} dataKey="value" stroke="none">
                       <Cell fill="#3b82f6" /><Cell fill="#ef4444" />
                     </Pie>
                     <Tooltip content={<CustomTooltip />} />
@@ -1922,16 +1686,15 @@ function App() {
                 </ResponsiveContainer>
                 <div style={{ position: 'absolute', top: isMobile ? '85%' : '80%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
                   <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: isMobile ? '1px' : '12px' }}>Blue 승률</div>
-                  <div style={{ fontSize: isMobile ? '26px' : '42px', fontWeight: '900', color: '#3b82f6' }}>{matches.length > 0 ? Math.round((winLossStats.Blue / matches.length) * 100) : 0}%</div>
+                  <div style={{ fontSize: isMobile ? '26px' : '42px', fontWeight: '900', color: '#3b82f6' }}>{seasonMatches.length > 0 ? Math.round((seasonWinLoss.Blue / seasonMatches.length) * 100) : 0}%</div>
                 </div>
               </section>
             </div>
 
-            {/* 경기 상세 테이블 */}
             {selectedMatchId && playerStats.length > 0 && (
               <section style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '14px' : '20px', marginTop: '0' }}>
                 {['Blue', 'Red'].map(side => {
-                  const currentMatch = matches.find(m => m.id === selectedMatchId);
+                  const currentMatch = seasonMatches.find(m => m.id === selectedMatchId) || matches.find(m => m.id === selectedMatchId);
                   const bans = side === 'Blue' ? (currentMatch?.blue_bans || []) : (currentMatch?.red_bans || []);
                   return (
                     <div key={side} style={{ backgroundColor: '#1f2937', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${side === 'Blue' ? '#3b82f6' : '#ef4444'}` }}>
@@ -1990,7 +1753,6 @@ function App() {
               </section>
             )}
 
-            {/* 경기 그래프 */}
             <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: isMobile ? '16px' : '30px', flexWrap: 'wrap', gap: '8px' }}>
                 <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff' }}>경기 그래프</h2>
@@ -2018,30 +1780,18 @@ function App() {
 
         {/* ===== 챔피언 분석 ===== */}
         {mainTab === 'champion' && (
-  <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
-    <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>⚔️ 챔피언 분석</h2>
-    <ChampionAnalysis
-      allStats={allStats}
-      matches={matches}
-      isMobile={isMobile}
-      onNavigateToMatch={(matchId) => {
-        setSelectedMatchId(matchId);
-        fetchMatchStats(matchId);
-        setMainTab('search');
-        const targetDate = matches.find(m => String(m.id) === String(matchId))?.match_date;
-        if (targetDate) setOpenDates(prev => ({ ...prev, [targetDate]: true }));
-        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
-      }}
-    />
-  </section>
-)}
+          <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
+            <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>⚔️ 챔피언 분석 <span style={{ fontSize: '13px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
+            <ChampionAnalysis allStats={seasonStats} matches={seasonMatches} isMobile={isMobile} onNavigateToMatch={(matchId) => { setSelectedMatchId(matchId); fetchMatchStats(matchId); setMainTab('search'); const targetDate = matches.find(m => String(m.id) === String(matchId))?.match_date; if (targetDate) setOpenDates(prev => ({ ...prev, [targetDate]: true })); setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100); }} />
+          </section>
+        )}
 
         {/* ===== 개인 지표 ===== */}
         {mainTab === 'player' && (
           <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: selectedPlayer ? '2px solid #3b82f6' : '1px solid #374151' }}>
             {!selectedPlayer && (
               <div style={{ marginBottom: '30px' }}>
-                <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '16px' }}>👤 개인 지표</h2>
+                <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '16px' }}>👤 개인 지표 <span style={{ fontSize: '13px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
                 <div style={{ position: 'relative', width: '100%', maxWidth: '500px', margin: '0 auto' }}>
                   <input type="text" placeholder="플레이어 닉네임을 검색하세요" value={playerSearchTerm} onChange={e => setPlayerSearchTerm(e.target.value)} style={{ width: '100%', backgroundColor: '#111827', border: '2px solid #3b82f6', borderRadius: '12px', padding: isMobile ? '12px 16px' : '15px 20px', color: '#fff', fontSize: isMobile ? '15px' : '16px', outline: 'none', boxSizing: 'border-box' }} autoFocus />
                 </div>
@@ -2057,37 +1807,23 @@ function App() {
                 )}
               </div>
             )}
-            <PlayerReport selectedPlayer={selectedPlayer} setSelectedPlayer={setSelectedPlayer} allStats={allStats} matches={matches} currentData={currentData} radarData={radarData} reportType={reportType} setReportType={setReportType} selectedLine={selectedLine} setSelectedLine={setSelectedLine} dataScope={dataScope} setDataScope={setDataScope} selectedChampion={selectedChampion} setSelectedChampion={setSelectedChampion} getRankingsByLine={getRankingsByLine} isMobile={isMobile} />
+            <PlayerReport selectedPlayer={selectedPlayer} setSelectedPlayer={setSelectedPlayer} allStats={seasonStats} matches={seasonMatches} currentData={currentData} radarData={radarData} reportType={reportType} setReportType={setReportType} selectedLine={selectedLine} setSelectedLine={setSelectedLine} dataScope={dataScope} setDataScope={setDataScope} selectedChampion={selectedChampion} setSelectedChampion={setSelectedChampion} getRankingsByLine={getRankingsByLine} isMobile={isMobile} />
           </section>
         )}
 
         {/* ===== 상대 전적 ===== */}
         {mainTab === 'h2h' && (
-  <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
-    <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>🆚 상대 전적</h2>
-    <HeadToHead
-      allStats={allStats}
-      matches={matches}
-      onNavigateToPlayer={nickname => handlePlayerClick(nickname, true)}
-      onNavigateToMatch={(matchId) => {
-        setSelectedMatchId(matchId);
-        fetchMatchStats(matchId);
-        setMainTab('search');
-        const targetDate = matches.find(m => String(m.id) === String(matchId))?.match_date;
-        if (targetDate) setOpenDates(prev => ({ ...prev, [targetDate]: true }));
-        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
-      }}
-      isMobile={isMobile}
-    />
-  </section>
-)}
-
+          <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
+            <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>🆚 상대 전적 <span style={{ fontSize: '13px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
+            <HeadToHead allStats={seasonStats} matches={seasonMatches} onNavigateToPlayer={nickname => handlePlayerClick(nickname, true)} onNavigateToMatch={(matchId) => { setSelectedMatchId(matchId); fetchMatchStats(matchId); setMainTab('search'); const targetDate = matches.find(m => String(m.id) === String(matchId))?.match_date; if (targetDate) setOpenDates(prev => ({ ...prev, [targetDate]: true })); setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100); }} isMobile={isMobile} />
+          </section>
+        )}
 
         {/* ===== 리더보드 ===== */}
         {mainTab === 'leaderboard' && (
           <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
-            <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>🏆 라인별 리더보드</h2>
-            <Leaderboard allStats={allStats} matches={matches} isMobile={isMobile} />
+            <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>🏆 리더보드 <span style={{ fontSize: '13px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
+            <Leaderboard allStats={seasonStats} matches={seasonMatches} isMobile={isMobile} />
           </section>
         )}
       </div>
