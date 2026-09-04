@@ -1376,8 +1376,8 @@ function App() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const { data: mData } = await supabase.from('matches').select('*').order('match_date', { ascending: false }).order('id', { ascending: false });
-      const { data: sDataTotal } = await supabase.from('match_stats').select('*, champion, match_id, matches:match_id(*)');
+      const { data: mData } = await supabase.from('matches').select('*').order('match_date', { ascending: false }).order('id', { ascending: false }).limit(2000);
+      const { data: sDataTotal } = await supabase.from('match_stats').select('*, champion, match_id, matches:match_id(*)').limit(10000);
       if (sDataTotal) setAllStats(sDataTotal);
       if (mData && mData.length > 0) {
         setMatches(mData);
