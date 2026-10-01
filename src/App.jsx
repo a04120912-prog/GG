@@ -1132,7 +1132,8 @@ function Leaderboard({ allStats, matches, isMobile }) {
     const nicknames = [...new Set(allStats.map(s => s.nickname))];
     return nicknames.map(nickname => {
       const laneStats = avgScope === 'lane' ? allStats.filter(s => normalizeLane(s.lane) === selectedLane && s.nickname === nickname) : allStats.filter(s => s.nickname === nickname);
-      if (laneStats.length < 5) return null;
+      const minGames = avgScope === 'total' ? 15 : 5;
+      if (laneStats.length < minGames) return null;
       let tMin = 0, tDmg = 0, tDmgTaken = 0, tGold = 0, tCs = 0, tVis = 0, tK = 0, tA = 0, tD = 0, tWins = 0, tKpSum = 0;
       const count = laneStats.length;
       laneStats.forEach(s => {
@@ -1246,7 +1247,7 @@ function Leaderboard({ allStats, matches, isMobile }) {
             {metrics.map(m => (<button key={m.id} onClick={() => setSelectedMetric(m.id)} style={{ padding: '7px 13px', borderRadius: '10px', border: selectedMetric === m.id ? `1px solid ${m.color}` : '1px solid #374151', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', backgroundColor: selectedMetric === m.id ? `${m.color}22` : '#111827', color: selectedMetric === m.id ? m.color : '#9ca3af' }}>{m.label}{!isMobile && <span style={{ fontSize: '11px', opacity: 0.6, marginLeft: '4px' }}>{m.desc}</span>}</button>))}
           </div>
           {sortedAvg.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>5경기 이상 데이터가 없습니다</p></div>
+            <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}><div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div><p>{avgScope === 'total' ? 15 : 5}경기 이상 데이터가 없습니다</p></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {sortedAvg.map((row, i) => {
