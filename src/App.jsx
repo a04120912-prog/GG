@@ -22,6 +22,7 @@ const useIsMobile = () => {
 };
 
 const SEASON2_START = '2026-07-01';
+const SEASON3_START = '2026-09-27';
 
 const laneOrder = {
   'TOP': 1, 'JNG': 2, 'JUNGLE': 2, 'MID': 3, 'ADC': 4, 'BOT': 4, 'SUP': 5, 'SUPPORT': 5
@@ -1352,16 +1353,17 @@ function App() {
   const [mainTab, setMainTab] = useState('search');
 
   // ===== 시즌 state =====
-  const [season, setSeason] = useState('season2');
+  const [season, setSeason] = useState('season3');
 
   useEffect(() => { fetchInitialData(); }, []);
 
   // ===== 시즌 필터링 =====
-  const seasonMatches = (() => {
-    if (season === 'season1') return matches.filter(m => m.match_date < SEASON2_START);
-    if (season === 'season2') return matches.filter(m => m.match_date >= SEASON2_START);
-    return matches;
-  })();
+const seasonMatches = (() => {
+  if (season === 'season1') return matches.filter(m => m.match_date < SEASON2_START);
+  if (season === 'season2') return matches.filter(m => m.match_date >= SEASON2_START && m.match_date < SEASON3_START);
+  if (season === 'season3') return matches.filter(m => m.match_date >= SEASON3_START);
+  return matches;
+})();
 
   const seasonMatchIds = new Set(seasonMatches.map(m => String(m.id)));
   const seasonStats = allStats.filter(s => seasonMatchIds.has(String(s.match_id)));
@@ -1384,8 +1386,8 @@ function App() {
         const stats = mData.reduce((acc, match) => { const winner = String(match.win_team || '').trim(); if (winner === 'Blue') acc.Blue += 1; else if (winner === 'Red') acc.Red += 1; return acc; }, { Blue: 0, Red: 0 });
         setWinLossStats(stats);
         // 시즌2 기준으로 첫 경기 선택
-        const season2Matches = mData.filter(m => m.match_date >= SEASON2_START);
-        const initialMatch = season2Matches.length > 0 ? season2Matches[0] : mData[0];
+        const season3Matches = mData.filter(m => m.match_date >= SEASON3_START);
+        const initialMatch = season3Matches.length > 0 ? season3Matches[0] : mData[0];
         setSelectedMatchId(initialMatch.id);
         fetchMatchStats(initialMatch.id);
         setOpenDates({ [initialMatch.match_date]: true });
@@ -1559,9 +1561,8 @@ function App() {
     { id: 'leaderboard', icon: '🏆', label: '리더보드' },
   ];
 
-  const seasonLabel = season === 'season1' ? '시즌 1' : season === 'season2' ? '시즌 2' : '통합';
-  const seasonColor = season === 'season1' ? '#a78bfa' : season === 'season2' ? '#3b82f6' : '#10b981';
-
+  const seasonLabel = season === 'season1' ? '시즌 1' : season === 'season2' ? '시즌 2' : season === 'season3' ? '시즌 3' : '통합';
+  const seasonColor = season === 'season1' ? '#a78bfa' : season === 'season2' ? '#3b82f6' : season === 'season3' ? '#f97316' : '#10b981';
   return (
     <div style={{ backgroundColor: '#0a0e17', minHeight: '100vh', width: '100%', margin: 0, padding: 0, color: '#f3f4f6', overflowX: 'hidden' }}>
 
@@ -1577,6 +1578,7 @@ function App() {
           {[
             { key: 'season1', label: '시즌 1', color: '#a78bfa', bg: '#2e1065' },
             { key: 'season2', label: '시즌 2', color: '#3b82f6', bg: '#1e3a5f' },
+            { key: 'season3', label: '시즌 3', color: '#f97316', bg: '#431407' }, 
             { key: 'all', label: '통합', color: '#10b981', bg: '#064e3b' },
           ].map(({ key, label, color, bg }) => (
             <button
