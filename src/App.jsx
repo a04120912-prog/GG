@@ -1332,6 +1332,231 @@ function Leaderboard({ allStats, matches, isMobile }) {
 }
 
 /* =====================================================
+   듀오 승률 탭
+   ===================================================== */
+const DUO_LANES = ['ALL', 'TOP', 'JNG', 'MID', 'ADC', 'SUP'];
+const DUO_LANE_LABEL = { ALL: '전체', TOP: '탑', JNG: '정글', MID: '미드', ADC: '원딜', SUP: '서폿' };
+const normalizeDuoLane = (raw) => {
+  const u = String(raw || '').toUpperCase().trim();
+  const map = { JUNGLE: 'JNG', BOT: 'ADC', SUPPORT: 'SUP' };
+  return map[u] || u;
+};
+
+// 컴포넌트 안에서 정의하면 입력할 때마다 포커스가 풀리므로 바깥에 둡니다
+function DuoPlayerPicker({ label, color, value, setValue, search, setSearch, lane, setLane, nicknames, isMobile }) {
+  return (
+    <div style={{ flex: 1, minWidth: isMobile ? '100%' : '280px' }}>
+      <div style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 'bold', marginBottom: '8px' }}>{label}</div>
+      {value ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#111827', padding: '12px 16px', borderRadius: '12px', border: `2px solid ${color}` }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />
+          <span style={{ fontWeight: 'bold', fontSize: '15px', flex: 1 }}>{value}</span>
+          <button onClick={() => { setValue(''); setSearch(''); }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text"
+            placeholder="닉네임 검색"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', backgroundColor: '#111827', border: `2px solid ${color}`, borderRadius: '12px', padding: '12px 16px', color: '#fff', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+          />
+          {search && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '10px', marginTop: '4px', zIndex: 10, maxHeight: '220px', overflowY: 'auto' }}>
+              {nicknames.filter(n => n.toLowerCase().includes(search.toLowerCase())).map(n => (
+                <div
+                  key={n}
+                  onClick={() => { setValue(n); setSearch(''); }}
+                  style={{ padding: '10px 16px', cursor: 'pointer', fontSize: '14px', borderBottom: '1px solid #374151' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#374151'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >{n}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+        {DUO_LANES.map(l => (
+          <button
+            key={l}
+            onClick={() => setLane(l)}
+            style={{ padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.2s', border: lane === l ? `1px solid ${color}` : '1px solid #374151', backgroundColor: lane === l ? `${color}33` : '#111827', color: lane === l ? '#fff' : '#9ca3af' }}
+          >{DUO_LANE_LABEL[l]}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DuoSynergy({ allStats, matches, onNavigateToMatch, isMobile }) {
+  const [playerA, setPlayerA] = useState('');
+  const [playerB, setPlayerB] = useState('');
+  const [searchA, setSearchA] = useState('');
+  const [searchB, setSearchB] = useState('');
+  const [laneA, setLaneA] = useState('ALL');
+  const [laneB, setLaneB] = useState('ALL');
+
+  const nicknames = [...new Set(allStats.map(s => s.nickname))].sort();
+
+  const result = (() => {
+    if (!playerA || !playerB || playerA === playerB) return null;
+
+    const matchMap = new Map(matches.map(m => [String(m.id), m]));
+    const byMatch = {};
+    allStats.forEach(s => {
+      if (s.nickname !== playerA && s.nickname !== playerB) return;
+      const k = String(s.match_id);
+      if (!byMatch[k]) byMatch[k] = [];
+      byMatch[k].push(s);
+    });
+
+    const games = [];
+    Object.entries(byMatch).forEach(([mid, rows]) => {
+      const a = rows.find(r => r.nickname === playerA);
+      const b = rows.find(r => r.nickname === playerB);
+      if (!a || !b) return;
+
+      const sideA = String(a.side || '').trim().toLowerCase();
+      const sideB = String(b.side || '').trim().toLowerCase();
+      if (!sideA || sideA !== sideB) return; // 같은 팀이 아니면 제외
+
+      if (laneA !== 'ALL' && normalizeDuoLane(a.lane) !== laneA) return;
+      if (laneB !== 'ALL' && normalizeDuoLane(b.lane) !== laneB) return;
+
+      const match = matchMap.get(mid);
+      if (!match) return;
+      const isWin = sideA === String(match.win_team || '').trim().toLowerCase();
+
+      games.push({
+        matchId: a.match_id,
+        date: match.match_date || '-',
+        duration: match.duration || '-',
+        side: sideA.includes('blue') ? 'Blue' : 'Red',
+        isWin,
+        a: { champion: a.champion, lane: normalizeDuoLane(a.lane), k: Number(a.kills || 0), d: Number(a.deaths || 0), as: Number(a.assists || 0) },
+        b: { champion: b.champion, lane: normalizeDuoLane(b.lane), k: Number(b.kills || 0), d: Number(b.deaths || 0), as: Number(b.assists || 0) },
+      });
+    });
+
+    games.sort((x, y) => new Date(y.date) - new Date(x.date));
+
+    const total = games.length;
+    const wins = games.filter(g => g.isWin).length;
+    const kdaOf = (key) => {
+      const k = games.reduce((s, g) => s + g[key].k, 0);
+      const d = games.reduce((s, g) => s + g[key].d, 0);
+      const a = games.reduce((s, g) => s + g[key].as, 0);
+      return d === 0 ? (k + a > 0 ? 'Perfect' : '0.00') : ((k + a) / d).toFixed(2);
+    };
+    return {
+      games, total, wins, losses: total - wins,
+      winRate: total > 0 ? Math.round((wins / total) * 100) : 0,
+      kdaA: kdaOf('a'), kdaB: kdaOf('b'),
+    };
+  })();
+
+  const winColor = result
+    ? (result.winRate >= 60 ? '#34d399' : result.winRate >= 50 ? '#60a5fa' : result.winRate >= 40 ? '#fbbf24' : '#f87171')
+    : '#9ca3af';
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'flex-start', gap: '16px', flexDirection: isMobile ? 'column' : 'row', marginBottom: '28px' }}>
+        <DuoPlayerPicker label="🔵 플레이어 A" color="#3b82f6" value={playerA} setValue={setPlayerA} search={searchA} setSearch={setSearchA} lane={laneA} setLane={setLaneA} nicknames={nicknames} isMobile={isMobile} />
+        <div style={{ alignSelf: 'center', fontSize: '16px', fontWeight: '900', color: '#6b7280', paddingTop: isMobile ? 0 : '26px' }}>+</div>
+        <DuoPlayerPicker label="🟣 플레이어 B" color="#a855f7" value={playerB} setValue={setPlayerB} search={searchB} setSearch={setSearchB} lane={laneB} setLane={setLaneB} nicknames={nicknames} isMobile={isMobile} />
+      </div>
+
+      {(!playerA || !playerB) && (
+        <div style={{ textAlign: 'center', padding: '60px', color: '#4b5563' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>🤝</div>
+          <p style={{ fontSize: '16px' }}>두 플레이어를 선택하세요</p>
+          <p style={{ fontSize: '13px', marginTop: '8px', color: '#374151' }}>같은 팀으로 함께 뛴 경기만 집계됩니다</p>
+        </div>
+      )}
+
+      {playerA && playerB && playerA === playerB && (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#f87171' }}>서로 다른 플레이어를 선택해주세요</div>
+      )}
+
+      {result && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '24px' }}>
+            <div style={{ backgroundColor: '#111827', padding: '18px', borderRadius: '12px', textAlign: 'center', border: `1px solid ${winColor}55` }}>
+              <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '6px' }}>승률</p>
+              <p style={{ fontSize: '28px', fontWeight: '900', color: winColor }}>{result.total > 0 ? `${result.winRate}%` : '-'}</p>
+            </div>
+            <div style={{ backgroundColor: '#111827', padding: '18px', borderRadius: '12px', textAlign: 'center', border: '1px solid #374151' }}>
+              <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '6px' }}>전적</p>
+              <p style={{ fontSize: '22px', fontWeight: 'bold' }}>
+                <span style={{ color: '#60a5fa' }}>{result.wins}승</span>
+                <span style={{ color: '#4b5563', margin: '0 6px' }}>/</span>
+                <span style={{ color: '#f87171' }}>{result.losses}패</span>
+              </p>
+            </div>
+            <div style={{ backgroundColor: '#111827', padding: '18px', borderRadius: '12px', textAlign: 'center', border: '1px solid #374151' }}>
+              <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '6px' }}>함께한 경기</p>
+              <p style={{ fontSize: '22px', fontWeight: 'bold', color: '#fff' }}>{result.total}</p>
+            </div>
+            <div style={{ backgroundColor: '#111827', padding: '14px', borderRadius: '12px', textAlign: 'center', border: '1px solid #374151' }}>
+              <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '6px' }}>듀오 KDA</p>
+              <p style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                <span style={{ color: '#60a5fa' }}>{playerA} {result.kdaA}</span>
+              </p>
+              <p style={{ fontSize: '13px', fontWeight: 'bold', marginTop: '2px' }}>
+                <span style={{ color: '#c084fc' }}>{playerB} {result.kdaB}</span>
+              </p>
+            </div>
+          </div>
+
+          <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '12px' }}>🗂️ 경기 목록</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '600px', overflowY: 'auto' }}>
+            {result.games.map((g, i) => (
+              <div
+                key={i}
+                onClick={() => onNavigateToMatch(g.matchId)}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#374151'}
+                style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px', backgroundColor: '#111827', borderRadius: '10px', padding: '12px 16px', border: '1px solid #374151', borderLeft: `4px solid ${g.isWin ? '#3b82f6' : '#ef4444'}`, cursor: 'pointer', transition: '0.15s' }}
+              >
+                <div style={{ width: isMobile ? '44px' : '60px', flexShrink: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: g.isWin ? '#60a5fa' : '#f87171' }}>{g.isWin ? '✓ 승리' : '✗ 패배'}</div>
+                  <div style={{ fontSize: '10px', color: g.side === 'Blue' ? '#3b82f6' : '#ef4444', marginTop: '2px' }}>{g.side}</div>
+                </div>
+
+                {[['a', playerA, '#60a5fa'], ['b', playerB, '#c084fc']].map(([key, name, c]) => (
+                  <div key={key} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <img src={getChampImgUrl(g[key].champion)} alt="" style={{ width: '34px', height: '34px', borderRadius: '7px', border: `2px solid ${c}`, flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '11px', color: c, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af' }}>{getChampKoName(g[key].champion)} · {g[key].lane}</div>
+                      <div style={{ fontSize: '12px', color: '#d1d5db' }}>{g[key].k}/{g[key].d}/{g[key].as}</div>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '2px' }}>{g.date}</div>
+                  <div style={{ fontSize: '11px', color: '#6b7280' }}>{g.duration}</div>
+                </div>
+              </div>
+            ))}
+            {result.games.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#4b5563' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>📭</div>
+                <p style={{ fontSize: '14px' }}>조건에 맞는 경기가 없습니다</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* =====================================================
    메인 앱
    ===================================================== */
 function App() {
@@ -1559,6 +1784,7 @@ const seasonMatches = (() => {
     { id: 'champion', icon: '⚔️', label: '챔피언 분석' },
     { id: 'player', icon: '👤', label: `개인 지표${selectedPlayer ? ` · ${selectedPlayer.nickname}` : ''}` },
     { id: 'h2h', icon: '🆚', label: '상대 전적' },
+    { id: 'duo', icon: '🤝', label: '듀오 승률' },
     { id: 'leaderboard', icon: '🏆', label: '리더보드' },
   ];
 
@@ -1822,6 +2048,26 @@ const seasonMatches = (() => {
           </section>
         )}
 
+        {/* ===== 듀오 승률 ===== */}
+{mainTab === 'duo' && (
+  <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
+    <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 'bold', color: '#fff', marginBottom: '24px' }}>🤝 듀오 승률 <span style={{ fontSize: '13px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
+    <DuoSynergy
+      allStats={seasonStats}
+      matches={seasonMatches}
+      isMobile={isMobile}
+      onNavigateToMatch={(matchId) => {
+        setSelectedMatchId(matchId);
+        fetchMatchStats(matchId);
+        setMainTab('search');
+        const targetDate = matches.find(m => String(m.id) === String(matchId))?.match_date;
+        if (targetDate) setOpenDates(prev => ({ ...prev, [targetDate]: true }));
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+      }}
+    />
+  </section>
+)}
+
         {/* ===== 리더보드 ===== */}
         {mainTab === 'leaderboard' && (
           <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '35px', borderRadius: '16px', border: '1px solid #374151' }}>
@@ -1838,7 +2084,7 @@ const seasonMatches = (() => {
             <button key={tab.id} onClick={() => setMainTab(tab.id)} style={{ flex: 1, padding: '10px 4px 8px', border: 'none', backgroundColor: 'transparent', color: mainTab === tab.id ? '#60a5fa' : '#4b5563', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', transition: '0.15s' }}>
               <span style={{ fontSize: '20px' }}>{tab.icon}</span>
               <span style={{ fontSize: '9px', fontWeight: mainTab === tab.id ? '700' : '500', whiteSpace: 'nowrap' }}>
-                {tab.id === 'player' ? '개인' : tab.id === 'search' ? '전적' : tab.id === 'champion' ? '챔피언' : tab.id === 'h2h' ? '상대' : '리더보드'}
+                {tab.id === 'player' ? '개인' : tab.id === 'search' ? '전적' : tab.id === 'champion' ? '챔피언' : tab.id === 'h2h' ? '상대' : tab.id === 'duo' ? '듀오' : '리더보드'}
               </span>
               {mainTab === tab.id && <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} />}
             </button>
