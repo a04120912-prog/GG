@@ -8,6 +8,10 @@ import {
 } from 'recharts';
 import './App.css';
 
+update match_stats
+set nickname = nickname || '(롤알못)'
+where nickname = 'winkingstar';
+
 /* =====================================================
    반응형 훅
    ===================================================== */
