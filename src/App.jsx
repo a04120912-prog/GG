@@ -1167,7 +1167,7 @@ result.avgGame = avgAll !== null ? {
       });
       const safeM = tMin || 1; const kdaNum = tD === 0 ? 9999 : (tK + tA) / tD;
       const mostChamp = getSignatureOrMostChamp(nickname, allStats, matches);
-      return { nickname, games: count, mostChamp, dpm: Math.round(tDmg / safeM), dtpm: Math.round(tDmgTaken / safeM), gpm: Math.round(tGold / safeM), cspm: parseFloat((tCs / safeM).toFixed(2)), avgVs: parseFloat((tVis / count).toFixed(1)), kda: kdaNum, kdaStr: tD === 0 ? 'Perfect' : kdaNum.toFixed(2), winRate: Math.round((tWins / count) * 100), kp: Math.round((tKpSum / count) * 100), dpg: tGold > 0 ? parseFloat((tDmg / tGold).toFixed(2)) : 0 };
+      return { nickname, games: count, mostChamp, dpm: Math.round(tDmg / safeM), dtpm: Math.round(tDmgTaken / safeM), gpm: Math.round(tGold / safeM), cspm: parseFloat((tCs / safeM).toFixed(2)), avgVs: parseFloat((tVis / count).toFixed(1)), kda: kdaNum, kdaStr: tD === 0 ? 'Perfect' : kdaNum.toFixed(2), winRate: Math.round((tWins / count) * 100), kp: Math.round((tKpSum / count) * 100), dpg: tGold > 0 ? parseFloat((tDmg / tGold).toFixed(2)) : 0, avgTime: tMin / count,};
     }).filter(Boolean);
   })();
 
@@ -1201,11 +1201,12 @@ result.avgGame = avgAll !== null ? {
   const totalInfo = totalMetrics.find(m => m.id === selectedTotal);
   const medalColor = (i) => ['#fbbf24', '#94a3b8', '#b45309'][i] ?? null;
   const medalEmoji = (i) => ['🥇', '🥈', '🥉'][i] ?? null;
-  const formatVal = (row) => {
-    if (selectedMetric === 'kda') return row.kdaStr;
-    if (selectedMetric === 'winRate' || selectedMetric === 'kp') return `${row[selectedMetric]}%`;
-    return typeof row[selectedMetric] === 'number' ? row[selectedMetric].toLocaleString() : row[selectedMetric];
-  };
+ const formatVal = (row) => {
+  if (selectedMetric === 'kda') return row.kdaStr;
+  if (selectedMetric === 'winRate' || selectedMetric === 'kp') return `${row[selectedMetric]}%`;
+  if (selectedMetric === 'avgTime') return secondsToDuration(row.avgTime * 60);   // ← 추가
+  return typeof row[selectedMetric] === 'number' ? row[selectedMetric].toLocaleString() : row[selectedMetric];
+};
 
   const RecordCard = ({ category, data }) => {
     if (!data) return (
