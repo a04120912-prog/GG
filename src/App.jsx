@@ -1086,6 +1086,7 @@ function Leaderboard({ allStats, matches, isMobile }) {
   const recordCategories = [
     { id: 'longestGame', label: '최장 경기', color: '#60a5fa', unit: '' },
     { id: 'shortestGame', label: '최단 경기', color: '#34d399', unit: '' },
+    { id: 'avgGame', label: '평균 경기 시간', color: '#2dd4bf', unit: '' },
     { id: 'mostKills', label: '단일 경기 최다 킬', color: '#f87171', unit: '킬' },
     { id: 'mostAssists', label: '단일 경기 최다 어시', color: '#34d399', unit: '어시' },
     { id: 'mostDamage', label: '단일 경기 최다 딜', color: '#fca5a5', unit: '' },
@@ -1098,6 +1099,11 @@ function Leaderboard({ allStats, matches, isMobile }) {
 
   const durationToSeconds = (dur) => { const [min, sec] = (dur || '0:00').split(':').map(Number); return (min || 0) * 60 + (sec || 0); };
 
+  const secondsToDuration = (sec) => {
+  const s = Math.round(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
   const recordData = (() => {
     const result = {};
     const matchDurations = matches.map(m => ({ matchId: m.id, date: m.match_date, duration: m.duration, seconds: durationToSeconds(m.duration), winTeam: m.win_team }));
@@ -1106,6 +1112,16 @@ function Leaderboard({ allStats, matches, isMobile }) {
     const getLongestPlayers = (matchId) => allStats.filter(s => String(s.match_id) === String(matchId)).map(s => s.nickname);
     result.longestGame = longest ? { value: longest.duration, date: longest.date, matchId: longest.matchId, players: getLongestPlayers(longest.matchId), sub: `${longest.winTeam} 승` } : null;
     result.shortestGame = shortest ? { value: shortest.duration, date: shortest.date, matchId: shortest.matchId, players: getLongestPlayers(shortest.matchId), sub: `${shortest.winTeam} 승` } : null;
+    const validDurations = matchDurations.filter(m => m.seconds > 0);
+const avgOf = (arr) => arr.length > 0 ? arr.reduce((s, m) => s + m.seconds, 0) / arr.length : null;
+const avgAll = avgOf(validDurations);
+const avgBlueWin = avgOf(validDurations.filter(m => String(m.winTeam || '').trim() === 'Blue'));
+const avgRedWin = avgOf(validDurations.filter(m => String(m.winTeam || '').trim() === 'Red'));
+result.avgGame = avgAll !== null ? {
+  value: secondsToDuration(avgAll),
+  date: null,
+  sub: `총 ${validDurations.length}경기 · 블루 승 ${avgBlueWin !== null ? secondsToDuration(avgBlueWin) : '-'} / 레드 승 ${avgRedWin !== null ? secondsToDuration(avgRedWin) : '-'}`,
+} : null;
     const playerRecords = allStats.map(s => {
       const match = matches.find(m => String(m.id) === String(s.match_id));
       const [min, sec] = (match?.duration || '20:00').split(':').map(Number);
@@ -1198,14 +1214,14 @@ function Leaderboard({ allStats, matches, isMobile }) {
         <div style={{ fontSize: '13px', color: '#4b5563' }}>데이터 없음</div>
       </div>
     );
-    const isMatchRecord = category.id === 'longestGame' || category.id === 'shortestGame';
+    const isMatchRecord = ['longestGame', 'shortestGame', 'avgGame'].includes(category.id);
     return (
       <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: `1px solid ${category.color}33`, display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ fontSize: '12px', color: category.color, fontWeight: 'bold', letterSpacing: '0.5px' }}>{category.label}</div>
         {isMatchRecord ? (
           <div>
             <div style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{data.value}</div>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>{data.date} · {data.sub}</div>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>{data.date ? `${data.date} · ` : ''}{data.sub}</div>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', alignItems: 'center', gap: '8px' }}>
@@ -1223,7 +1239,9 @@ function Leaderboard({ allStats, matches, isMobile }) {
             </div>
           </div>
         )}
-        <div style={{ fontSize: '11px', color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: '8px' }}>📅 {data.date} · ⏱️ {data.duration || data.value}</div>
+        {data.date && (
+  <div style={{ fontSize: '11px', color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: '8px' }}>📅 {data.date} · ⏱️ {data.duration || data.value}</div>
+)}
       </div>
     );
   };
