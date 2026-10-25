@@ -1117,7 +1117,9 @@ const avgRedWin = avgOf(validDurations.filter(m => String(m.winTeam || '').trim(
 result.avgGame = avgAll !== null ? {
   value: secondsToDuration(avgAll),
   date: null,
-  sub: `총 ${validDurations.length}경기 · 블루 승 ${avgBlueWin !== null ? secondsToDuration(avgBlueWin) : '-'} / 레드 승 ${avgRedWin !== null ? secondsToDuration(avgRedWin) : '-'}`,
+  count: validDurations.length,
+  blueAvg: avgBlueWin,   // 초 단위, 없으면 null
+  redAvg: avgRedWin,
 } : null;
     const playerRecords = allStats.map(s => {
       const match = matches.find(m => String(m.id) === String(s.match_id));
@@ -1212,6 +1214,33 @@ result.avgGame = avgAll !== null ? {
         <div style={{ fontSize: '13px', color: '#4b5563' }}>데이터 없음</div>
       </div>
     );
+    if (category.id === 'avgGame') {
+  const maxSec = Math.max(data.blueAvg || 0, data.redAvg || 0, 1);
+  const rows = [
+    { label: '블루 승', sec: data.blueAvg, color: '#3b82f6', text: '#60a5fa' },
+    { label: '레드 승', sec: data.redAvg, color: '#ef4444', text: '#f87171' },
+  ];
+  return (
+    <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: `1px solid ${category.color}33`, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div style={{ fontSize: '12px', color: category.color, fontWeight: 'bold', letterSpacing: '0.5px' }}>{category.label}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+        <div style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{data.value}</div>
+        <div style={{ fontSize: '12px', color: '#6b7280' }}>총 {data.count}경기 기준</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #1f2937', paddingTop: '12px' }}>
+        {rows.map(r => (
+          <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ width: '44px', fontSize: '11px', fontWeight: 'bold', color: r.text, flexShrink: 0 }}>{r.label}</span>
+            <div style={{ flex: 1, height: '6px', borderRadius: '3px', backgroundColor: '#1f2937', overflow: 'hidden' }}>
+              <div style={{ width: `${r.sec ? (r.sec / maxSec) * 100 : 0}%`, height: '100%', backgroundColor: r.color, borderRadius: '3px' }} />
+            </div>
+            <span style={{ width: '44px', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#d1d5db', flexShrink: 0 }}>{r.sec ? secondsToDuration(r.sec) : '-'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
     const isMatchRecord = ['longestGame', 'shortestGame', 'avgGame'].includes(category.id);
     return (
       <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: `1px solid ${category.color}33`, display: 'flex', flexDirection: 'column', gap: '12px' }}>
