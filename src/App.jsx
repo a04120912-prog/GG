@@ -1074,6 +1074,7 @@ function Leaderboard({ allStats, matches, isMobile }) {
     { id: 'avgVs', label: '시야', color: '#38bdf8', desc: '평균 시야 점수' },
     { id: 'kp', label: 'KP%', color: '#f472b6', desc: '킬 관여율' },
     { id: 'dpg', label: '딜/골드', color: '#ec4899', desc: '골드당 데미지' },
+    { id: 'avgTime', label: '평균 시간', color: '#2dd4bf', desc: '평균 경기 시간' },
   ];
   const totalMetrics = [
     { id: 'totalKills', label: '⚔️ 총 킬', color: '#f87171', unit: '킬' },
