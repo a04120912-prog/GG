@@ -1223,10 +1223,10 @@ result.avgGame = avgAll !== null ? {
   return (
     <div style={{ backgroundColor: '#111827', borderRadius: '16px', padding: '20px', border: `1px solid ${category.color}33`, display: 'flex', flexDirection: 'column', gap: '14px' }}>
       <div style={{ fontSize: '12px', color: category.color, fontWeight: 'bold', letterSpacing: '0.5px' }}>{category.label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-        <div style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{data.value}</div>
-        <div style={{ fontSize: '12px', color: '#6b7280' }}>총 {data.count}경기 기준</div>
-      </div>
+     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+  <div style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{data.value}</div>
+  <div style={{ fontSize: '12px', color: '#6b7280' }}>총 {data.count}경기 기준</div>
+</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #1f2937', paddingTop: '12px' }}>
         {rows.map(r => (
           <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
