@@ -1622,6 +1622,7 @@ function App() {
   const [selectedLine, setSelectedLine] = useState('ALL');
   const [openDates, setOpenDates] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [matchSearchTerm, setMatchSearchTerm] = useState('');
   const [dataScope, setDataScope] = useState('ALL');
   const [selectedChampion, setSelectedChampion] = useState(null);
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
@@ -1824,7 +1825,23 @@ const seasonMatches = (() => {
   const playerSearchResults = [...new Set(seasonStats.map(s => s.nickname))].filter(name => name.toLowerCase().includes(playerSearchTerm.toLowerCase())).map(name => { const pHistory = seasonStats.filter(s => s.nickname === name); const wins = pHistory.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length; return { nickname: name, totalGames: pHistory.length, winRate: Math.round((wins / pHistory.length) * 100), mostLane: Object.entries(pHistory.reduce((acc, curr) => { const lane = String(curr.lane || 'MID').toUpperCase(); acc[lane] = (acc[lane] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0][0] }; });
 
   const toggleDate = (date) => { setOpenDates(prev => ({ ...prev, [date]: !prev[date] })); };
-  const groupedMatches = seasonMatches.reduce((acc, match) => { if (!acc[match.match_date]) acc[match.match_date] = []; acc[match.match_date].push(match); return acc; }, {});
+  const matchSearchLower = matchSearchTerm.trim().toLowerCase();
+
+const matchIdsWithPlayer = matchSearchLower
+  ? new Set(
+      seasonStats
+        .filter(s => String(s.nickname || '').toLowerCase().includes(matchSearchLower))
+        .map(s => String(s.match_id))
+    )
+  : null;
+
+const filteredMatches = matchIdsWithPlayer
+  ? seasonMatches.filter(m
+  const groupedMatches = filteredMatches.reduce((acc, match) => {
+  if (!acc[match.match_date]) acc[match.match_date] = [];
+  acc[match.match_date].push(match);
+  return acc;
+}, {});
 
   if (loading) return <div style={{ color: '#fff', textAlign: 'center', marginTop: '100px' }}>데이터 로딩 중...</div>;
 
@@ -1924,14 +1941,29 @@ const seasonMatches = (() => {
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '16px' : '25px' }}>
               <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '14px' : '25px', borderRadius: '16px', minHeight: isMobile ? '280px' : '350px', maxHeight: isMobile ? '280px' : '350px', display: 'flex', flexDirection: 'column' }}>
                 <h2 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: isMobile ? '14px' : '20px', color: '#fff' }}>⚔️ 경기 기록 <span style={{ fontSize: '12px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
+                <div style={{ position: 'relative', marginBottom: '12px' }}>
+  <input
+    type="text"
+    placeholder="닉네임으로 경기 찾기"
+    value={matchSearchTerm}
+    onChange={e => setMatchSearchTerm(e.target.value)}
+    style={{ width: '100%', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '10px', padding: '9px 32px 9px 12px', color: '#fff', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+  />
+  {matchSearchTerm && (
+    <button onClick={() => setMatchSearchTerm('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+  )}
+</div>
+{matchSearchTerm && (
+  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>{filteredMatches.length}경기 검색됨</div>
+)}
                 <div className="custom-scroll" style={{ overflowY: 'auto', gap: '8px', display: 'flex', flexDirection: 'column' }}>
                   {Object.keys(groupedMatches).map(date => (
                     <div key={date}>
                       <div onClick={() => toggleDate(date)} style={{ padding: isMobile ? '10px 12px' : '12px 15px', backgroundColor: '#111827', borderRadius: '10px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #374151', marginBottom: '4px' }}>
                         <span style={{ fontWeight: 'bold', fontSize: isMobile ? '13px' : '14px' }}>📅 {date}</span>
-                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{groupedMatches[date].length}경기 {openDates[date] ? '▲' : '▼'}</span>
+                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{groupedMatches[date].length}경기 {(openDates[date] || matchSearchTerm) ? '▲' : '▼'}</span>
                       </div>
-                      {openDates[date] && (
+                      {(openDates[date] || matchSearchTerm) && (
                         <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
                           {groupedMatches[date].map(m => (
                             <div key={m.id} onClick={() => { setSelectedMatchId(m.id); fetchMatchStats(m.id); }} style={{ padding: '12px', borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMatchId === m.id ? '#374151' : '#111827', borderLeft: `4px solid ${m.win_team === 'Blue' ? '#3b82f6' : '#ef4444'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', border: '1px solid #1f2937' }}>
