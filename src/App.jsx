@@ -1836,7 +1836,8 @@ const matchIdsWithPlayer = matchSearchLower
   : null;
 
 const filteredMatches = matchIdsWithPlayer
-  ? seasonMatches.filter(m
+  ? seasonMatches.filter(m => matchIdsWithPlayer.has(String(m.id)))
+  : seasonMatches;
   const groupedMatches = filteredMatches.reduce((acc, match) => {
   if (!acc[match.match_date]) acc[match.match_date] = [];
   acc[match.match_date].push(match);
