@@ -1720,15 +1720,7 @@ const seasonMatches = (() => {
     } catch (err) { console.error(err); }
   };
 
-  // 시즌 변경 시 첫 경기 자동 선택
-  useEffect(() => {
-    if (seasonMatches.length > 0) {
-      const first = seasonMatches[0];
-      setSelectedMatchId(first.id);
-      fetchMatchStats(first.id);
-      setOpenDates({ [first.match_date]: true });
-    }
-  }, [season]);
+  // 시즌 변경 시 첫 경기 자동 선
 
   const handlePlayerClick = (nickname, navigateToPlayer = false) => {
     try {
@@ -1933,7 +1925,21 @@ useEffect(() => {
           <>
             <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '16px' : '30px', borderRadius: isMobile ? '16px' : '20px', border: '1px solid #374151', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? '16px' : '20px' }}>
               <div style={{ position: 'relative', width: '100%', maxWidth: '600px' }}>
-                <input type="text" placeholder="플레이어 닉네임을 검색하세요" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', backgroundColor: '#111827', border: '2px solid #3b82f6', borderRadius: '12px', padding: isMobile ? '12px 16px' : '15px 20px', color: '#fff', fontSize: isMobile ? '15px' : '16px', outline: 'none', boxSizing: 'border-box' }} />
+                <input type="text" placeholder="플레이어 닉네임을 검색하세요" value={searchTerm} onChange={e => {
+  const v = e.target.value;
+  setSearchTerm(v);
+  const lower = v.trim().toLowerCase();
+  if (lower) {
+    const ids = new Set(
+      seasonStats
+        .filter(s => String(s.nickname || '').toLowerCase().includes(lower))
+        .map(s => String(s.match_id))
+    );
+    const open = {};
+    seasonMatches.filter(m => ids.has(String(m.id))).forEach(m => { open[m.match_date] = true; });
+    setOpenDates(open);
+  }
+}} style={{ width: '100%', backgroundColor: '#111827', border: '2px solid #3b82f6', borderRadius: '12px', padding: isMobile ? '12px 16px' : '15px 20px', color: '#fff', fontSize: isMobile ? '15px' : '16px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
             </section>
 
