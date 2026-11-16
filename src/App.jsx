@@ -454,7 +454,27 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
       </div>
     );
   }
+const lineHistory = selectedLine === 'ALL'
+    ? selectedPlayer.fullHistory
+    : selectedPlayer.fullHistory.filter(h => h.lane === selectedLine);
 
+  const champList = Object.values(
+    lineHistory.reduce((acc, h) => {
+      if (!h.champion || h.champion === 'undefined') return acc;
+      if (!acc[h.champion]) acc[h.champion] = { name: h.champion, games: 0, wins: 0 };
+      acc[h.champion].games++;
+      if (h.isWin) acc[h.champion].wins++;
+      return acc;
+    }, {})
+  ).sort((a, b) => b.games - a.games);
+
+  const champSearchLower = champSearch.trim().toLowerCase();
+  const champMatches = champSearchLower
+    ? champList.filter(c =>
+        getChampKoName(c.name).toLowerCase().includes(champSearchLower) ||
+        c.name.toLowerCase().includes(champSearchLower))
+    : [];
+  
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '10px' }}>
@@ -477,6 +497,12 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
         })}
       </div>
 
+      {selectedChampion && (
+  <div style={{ fontSize: '12px', color: '#fbbf24', marginBottom: '10px', fontWeight: 'bold' }}>
+    ⭐ {getChampKoName(selectedChampion)} 기준 지표 ({currentData.history.length}경기{dataScope === 'RECENT' ? ' · 최근 10경기 제한' : ''})
+  </div>
+)}
+
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '25px' }}>
         <StatItem label="승률" value={`${currentData.winRate}%`} color="#3b82f6" />
         <StatItem label="KDA" value={currentData.kda} color="#10b981" rank={getRankingsByLine(selectedPlayer.nickname, 'avgKda', selectedLine, currentData)} />
@@ -491,7 +517,50 @@ function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, cu
         <StatItem label="시야 점수" value={currentData.avgVs} color="#60a5fa" rank={getRankingsByLine(selectedPlayer.nickname, 'avgVs', selectedLine, currentData)} />
         <StatItem label="제어 와드" value={`${currentData.avgControlWards}개`} color="#60a5fa" rank={getRankingsByLine(selectedPlayer.nickname, 'avgControlWards', selectedLine, currentData)} />
       </div>
+<div style={{ backgroundColor: '#111827', padding: '16px 20px', borderRadius: '16px', border: '1px solid #374151', marginBottom: '25px' }}>
+  <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '12px' }}>🔎 챔피언별 상세 지표</h3>
 
+  {selectedChampion ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#1f2937', padding: '10px 14px', borderRadius: '12px', border: '2px solid #fbbf24' }}>
+      <img src={getChampImgUrl(selectedChampion)} alt="" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px' }}>{getChampKoName(selectedChampion)}</div>
+        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{currentData.history.length}경기 · 승률 {currentData.winRate}% · KDA {currentData.kda}</div>
+      </div>
+      <button onClick={() => { setSelectedChampion(null); setChampSearch(''); }} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+    </div>
+  ) : (
+    <div style={{ position: 'relative' }}>
+      <input
+        type="text"
+        placeholder="챔피언 이름 검색 (예: 가렌, Garen)"
+        value={champSearch}
+        onChange={e => setChampSearch(e.target.value)}
+        style={{ width: '100%', backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '10px', padding: '10px 14px', color: '#fff', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+      />
+      {champSearchLower && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '10px', marginTop: '4px', zIndex: 10, maxHeight: '240px', overflowY: 'auto' }}>
+          {champMatches.length === 0 && (
+            <div style={{ padding: '12px 14px', fontSize: '13px', color: '#6b7280' }}>플레이한 기록이 없습니다</div>
+          )}
+          {champMatches.map(c => (
+            <div
+              key={c.name}
+              onClick={() => { setSelectedChampion(c.name); setChampSearch(''); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid #374151' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#374151'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <img src={getChampImgUrl(c.name)} alt="" style={{ width: '28px', height: '28px', borderRadius: '6px' }} />
+              <span style={{ flex: 1, fontSize: '13px', color: '#fff' }}>{getChampKoName(c.name)}</span>
+              <span style={{ fontSize: '11px', color: '#9ca3af' }}>{c.games}경기 · {Math.round((c.wins / c.games) * 100)}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )}
+</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: '#111827', padding: '5px', paddingBottom: '20px', borderRadius: '16px', border: '1px solid #374151' }}>
           <h3 style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px', padding: '8px 15px 0' }}>🔝 MOST PICKED</h3>
