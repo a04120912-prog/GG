@@ -1824,13 +1824,12 @@ const seasonMatches = (() => {
   const searchResults = [...new Set(seasonStats.map(s => s.nickname))].filter(name => name.toLowerCase().includes(searchTerm.toLowerCase())).map(name => { const pHistory = seasonStats.filter(s => s.nickname === name); const wins = pHistory.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length; return { nickname: name, totalGames: pHistory.length, winRate: Math.round((wins / pHistory.length) * 100), mostLane: Object.entries(pHistory.reduce((acc, curr) => { const lane = String(curr.lane || 'MID').toUpperCase(); acc[lane] = (acc[lane] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0][0] }; });
   const playerSearchResults = [...new Set(seasonStats.map(s => s.nickname))].filter(name => name.toLowerCase().includes(playerSearchTerm.toLowerCase())).map(name => { const pHistory = seasonStats.filter(s => s.nickname === name); const wins = pHistory.filter(s => String(s.side || '').trim().toLowerCase() === String(s.matches?.win_team || '').trim().toLowerCase()).length; return { nickname: name, totalGames: pHistory.length, winRate: Math.round((wins / pHistory.length) * 100), mostLane: Object.entries(pHistory.reduce((acc, curr) => { const lane = String(curr.lane || 'MID').toUpperCase(); acc[lane] = (acc[lane] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0][0] }; });
 
-  const toggleDate = (date) => { setOpenDates(prev => ({ ...prev, [date]: !prev[date] })); };
-  const matchSearchLower = matchSearchTerm.trim().toLowerCase();
+  const searchLower = searchTerm.trim().toLowerCase();
 
-const matchIdsWithPlayer = matchSearchLower
+const matchIdsWithPlayer = searchLower
   ? new Set(
       seasonStats
-        .filter(s => String(s.nickname || '').toLowerCase().includes(matchSearchLower))
+        .filter(s => String(s.nickname || '').toLowerCase().includes(searchLower))
         .map(s => String(s.match_id))
     )
   : null;
@@ -1838,13 +1837,14 @@ const matchIdsWithPlayer = matchSearchLower
 const filteredMatches = matchIdsWithPlayer
   ? seasonMatches.filter(m => matchIdsWithPlayer.has(String(m.id)))
   : seasonMatches;
-  const groupedMatches = filteredMatches.reduce((acc, match) => {
+
+const groupedMatches = filteredMatches.reduce((acc, match) => {
   if (!acc[match.match_date]) acc[match.match_date] = [];
   acc[match.match_date].push(match);
   return acc;
 }, {});
 
-  useEffect(() => {
+useEffect(() => {
   const term = searchTerm.trim();
   if (!term) return;
   const open = {};
@@ -1935,16 +1935,6 @@ const filteredMatches = matchIdsWithPlayer
               <div style={{ position: 'relative', width: '100%', maxWidth: '600px' }}>
                 <input type="text" placeholder="플레이어 닉네임을 검색하세요" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', backgroundColor: '#111827', border: '2px solid #3b82f6', borderRadius: '12px', padding: isMobile ? '12px 16px' : '15px 20px', color: '#fff', fontSize: isMobile ? '15px' : '16px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
-              {searchTerm && (
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? '10px' : '15px', width: '100%' }}>
-                  {searchResults.map(player => (
-                    <div key={player.nickname} onClick={() => handlePlayerClick(player.nickname, true)} style={{ backgroundColor: '#111827', padding: isMobile ? '12px' : '15px', borderRadius: '12px', border: '1px solid #374151', cursor: 'pointer' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: isMobile ? '14px' : '15px', marginBottom: '5px' }}>{player.nickname}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#9ca3af' }}><span>{player.mostLane}</span><span style={{ color: player.winRate >= 50 ? '#3b82f6' : '#ef4444' }}>{player.winRate}%</span></div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </section>
 
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '16px' : '25px' }}>
