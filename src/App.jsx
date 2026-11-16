@@ -1844,6 +1844,14 @@ const filteredMatches = matchIdsWithPlayer
   return acc;
 }, {});
 
+  useEffect(() => {
+  const term = searchTerm.trim();
+  if (!term) return;
+  const open = {};
+  Object.keys(groupedMatches).forEach(d => { open[d] = true; });
+  setOpenDates(open);
+}, [searchTerm]);
+
   if (loading) return <div style={{ color: '#fff', textAlign: 'center', marginTop: '100px' }}>데이터 로딩 중...</div>;
 
   const tabList = [
@@ -1962,9 +1970,9 @@ const filteredMatches = matchIdsWithPlayer
                     <div key={date}>
                       <div onClick={() => toggleDate(date)} style={{ padding: isMobile ? '10px 12px' : '12px 15px', backgroundColor: '#111827', borderRadius: '10px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #374151', marginBottom: '4px' }}>
                         <span style={{ fontWeight: 'bold', fontSize: isMobile ? '13px' : '14px' }}>📅 {date}</span>
-                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{groupedMatches[date].length}경기 {(openDates[date] || matchSearchTerm) ? '▲' : '▼'}</span>
+                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{groupedMatches[date].length}경기 {openDates[date] ? '▲' : '▼'}</span>
                       </div>
-                      {(openDates[date] || matchSearchTerm) && (
+                      {(openDates[date]) && (
                         <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
                           {groupedMatches[date].map(m => (
                             <div key={m.id} onClick={() => { setSelectedMatchId(m.id); fetchMatchStats(m.id); }} style={{ padding: '12px', borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedMatchId === m.id ? '#374151' : '#111827', borderLeft: `4px solid ${m.win_team === 'Blue' ? '#3b82f6' : '#ef4444'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', border: '1px solid #1f2937' }}>
