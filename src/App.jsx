@@ -1940,21 +1940,6 @@ useEffect(() => {
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '16px' : '25px' }}>
               <section style={{ backgroundColor: '#1f2937', padding: isMobile ? '14px' : '25px', borderRadius: '16px', minHeight: isMobile ? '280px' : '350px', maxHeight: isMobile ? '280px' : '350px', display: 'flex', flexDirection: 'column' }}>
                 <h2 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: isMobile ? '14px' : '20px', color: '#fff' }}>⚔️ 경기 기록 <span style={{ fontSize: '12px', color: seasonColor, fontWeight: 'normal' }}>({seasonLabel})</span></h2>
-                <div style={{ position: 'relative', marginBottom: '12px' }}>
-  <input
-    type="text"
-    placeholder="닉네임으로 경기 찾기"
-    value={matchSearchTerm}
-    onChange={e => setMatchSearchTerm(e.target.value)}
-    style={{ width: '100%', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '10px', padding: '9px 32px 9px 12px', color: '#fff', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
-  />
-  {matchSearchTerm && (
-    <button onClick={() => setMatchSearchTerm('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '14px' }}>✕</button>
-  )}
-</div>
-{matchSearchTerm && (
-  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>{filteredMatches.length}경기 검색됨</div>
-)}
                 <div className="custom-scroll" style={{ overflowY: 'auto', gap: '8px', display: 'flex', flexDirection: 'column' }}>
                   {Object.keys(groupedMatches).map(date => (
                     <div key={date}>
