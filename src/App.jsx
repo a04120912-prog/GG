@@ -445,6 +445,8 @@ function ChampionAnalysis({ allStats, matches, isMobile, onNavigateToMatch }) {
    ===================================================== */
 function PlayerReport({ selectedPlayer, setSelectedPlayer, allStats, matches, currentData, radarData, reportType, setReportType, selectedLine, setSelectedLine, dataScope, setDataScope, selectedChampion, setSelectedChampion, getRankingsByLine, isMobile }) {
 
+const [champSearch, setChampSearch] = useState('');
+  
   if (!selectedPlayer || !currentData) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '16px', color: '#4b5563' }}>
